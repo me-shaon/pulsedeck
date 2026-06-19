@@ -47,6 +47,9 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.8.5
+      nanoid:
+        specifier: ^5.0.9
+        version: 5.1.14
       postgres:
         specifier: ^3.4.5
         version: 3.4.9
@@ -1921,6 +1924,11 @@ packages:
   nanoid@3.3.13:
     resolution: {integrity: sha512-sPdqC6ByMVVGvF1ynvvMo0/o+oD1VX7DaHhijt1bFgjvBkHBib4t49GoNDhf2NDta4oeUNlaGbSt5K7qjZ955Q==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
+  nanoid@5.1.14:
+    resolution: {integrity: sha512-5c8l8kVzqpnDPaicbEop/fV0Q1w16FmbWtVhMqugTozAwYdlIQojWH5a/M7UfziFmGdQRrUdV+EPzc9Xng3VAQ==}
+    engines: {node: ^18 || >=20}
     hasBin: true
 
   natural-compare@1.4.0:
@@ -3920,6 +3928,8 @@ snapshots:
       thenify-all: 1.6.0
 
   nanoid@3.3.13: {}
+
+  nanoid@5.1.14: {}
 
   natural-compare@1.4.0: {}
 

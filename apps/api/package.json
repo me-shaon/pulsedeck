@@ -10,13 +10,17 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "db:generate": "node --import tsx ./node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --import tsx ./node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio": "node --import tsx ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
     "@pulsedeck/schema": "workspace:*",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.2",
     "fastify": "^5.2.0",
+    "nanoid": "^5.0.9",
     "postgres": "^3.4.5",
     "zod": "^3.24.1"
   },

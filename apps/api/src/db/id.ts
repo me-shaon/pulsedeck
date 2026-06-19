@@ -20,6 +20,7 @@ export const ID_PREFIXES = {
   dashboard: 'dsh',
   reportMetric: 'mtr',
   invite: 'inv',
+  registrationToken: 'regtok',
 } as const;
 
 /** Union of every valid id prefix (`'ws' | 'usr' | ...`). */

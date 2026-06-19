@@ -4,6 +4,7 @@ import { dashboards } from './dashboards.js';
 import { reportMetrics } from './report-metrics.js';
 import { reports } from './reports.js';
 import { sourceCategories, sourceStreams, sources } from './sources.js';
+import { sourceRegistrationTokens } from './source-registration-tokens.js';
 import { streams } from './streams.js';
 import { users } from './users.js';
 import { workspaceMembers, workspaces } from './workspaces.js';
@@ -40,6 +41,14 @@ export const sourcesRelations = relations(sources, ({ one, many }) => ({
   categories: many(sourceCategories),
   streams: many(sourceStreams),
   reports: many(reports),
+  registrationTokens: many(sourceRegistrationTokens),
+}));
+
+export const sourceRegistrationTokensRelations = relations(sourceRegistrationTokens, ({ one }) => ({
+  source: one(sources, {
+    fields: [sourceRegistrationTokens.sourceId],
+    references: [sources.id],
+  }),
 }));
 
 export const sourceCategoriesRelations = relations(sourceCategories, ({ one }) => ({

@@ -15,6 +15,13 @@
       "when": 1781869116367,
       "tag": "0001_oval_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781875825377,
+      "tag": "0002_soft_morlun",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,7 @@ export * from './workspaces.js';
 export * from './categories.js';
 export * from './streams.js';
 export * from './sources.js';
+export * from './source-registration-tokens.js';
 export * from './reports.js';
 export * from './report-metrics.js';
 export * from './dashboards.js';

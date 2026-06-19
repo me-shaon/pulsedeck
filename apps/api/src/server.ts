@@ -5,6 +5,7 @@ import { createDrizzle, type Db } from './db/index.js';
 import type { Sql } from './db.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { sourceRoutes } from './routes/sources.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 
 // Shared singletons are decorated onto the app so every route/plugin reads them
@@ -56,6 +57,8 @@ export function buildServer({
   // Default request decorations the auth preHandlers populate.
   app.decorateRequest('user', null);
   app.decorateRequest('workspaceRole', null);
+  // Populated by the source bearer-auth preHandler (`makeRequireSource`).
+  app.decorateRequest('source', null);
 
   // Generic error handler: log the real error server-side, return an opaque
   // message so internal/driver/auth detail never leaks in the response body.
@@ -71,6 +74,7 @@ export function buildServer({
   app.register(healthRoutes);
   app.register(authRoutes);
   app.register(workspaceRoutes);
+  app.register(sourceRoutes);
 
   return app;
 }

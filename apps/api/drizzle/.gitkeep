@@ -1,0 +1,2 @@
+# Drizzle migrations land here in Phase 2. Kept empty in Phase 0 so the
+# migration runner has a folder to scan (and no-ops while it's empty).

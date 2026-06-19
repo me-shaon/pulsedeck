@@ -1,0 +1,38 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
+      AUTH_SECRET: changeme
+      RETENTION_DAYS: 0
+    ports:
+      - '${API_PORT:-3001}:3001'
+    depends_on:
+      - postgres # redis intentionally NOT required to boot
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '${WEB_PORT:-3000}:80'
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: pulsedeck
+      POSTGRES_PASSWORD: pulsedeck
+      POSTGRES_DB: pulsedeck
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    profiles: ['realtime']
+
+volumes:
+  postgres_data:

@@ -1,7 +1,7 @@
 import type { Block } from '@pulsedeck/schema';
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
-import { serverTimestamp, tsvector } from './columns.js';
+import { index, jsonb, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
+import { serverTimestamp, tsvector, utcTimestamp } from './columns.js';
 import { reportSeverity } from './enums.js';
 import { sources } from './sources.js';
 import { streams } from './streams.js';
@@ -41,7 +41,7 @@ export const reports = pgTable(
     title: text('title').notNull(),
     summary: text('summary'),
     severity: reportSeverity('severity'),
-    occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).notNull(),
+    occurredAt: utcTimestamp('occurred_at').notNull(),
     receivedAt: serverTimestamp('received_at'),
     createdAt: serverTimestamp('created_at'),
     tags: text('tags')
@@ -52,11 +52,15 @@ export const reports = pgTable(
     // Plain tsvector, populated by the ingest INSERT (Phase 5) as
     // `to_tsvector('english', title || ' ' || summary || ' ' || tags...)`.
     // Not a generated column — see the table doc above (error 42P17).
-    searchVector: tsvector('search_vector'),
+    // `.notNull()` makes populating it a compile-time obligation on every
+    // insert, so a forgotten vector can't silently make a report unsearchable.
+    searchVector: tsvector('search_vector').notNull(),
   },
   (t) => [
     uniqueIndex('reports_source_idempotency_uq').on(t.sourceId, t.idempotencyKey),
-    index('reports_stream_occurred_idx').on(t.streamId, t.occurredAt.desc()),
+    // Stream feed orders by server time (`received_at`), matching retention and
+    // the realtime arrival order; `occurred_at` is agent-supplied and untrusted.
+    index('reports_stream_received_idx').on(t.streamId, t.receivedAt.desc()),
     index('reports_search_vector_idx').using('gin', t.searchVector),
   ],
 );

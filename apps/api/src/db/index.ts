@@ -16,4 +16,5 @@ export function createDrizzle(sql: Sql) {
 export type Db = ReturnType<typeof createDrizzle>;
 
 export { schema };
+export * from './schema/index.js';
 export * from './id.js';

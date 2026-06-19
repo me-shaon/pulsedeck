@@ -1,5 +1,5 @@
 {
-  "id": "ddcd227c-c5e8-462e-a9de-90c4a9b6fe36",
+  "id": "b36cea4e-0b1e-4b31-b8cc-34b1e531f1e7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -590,7 +590,7 @@
           "name": "search_vector",
           "type": "tsvector",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         }
       },
       "indexes": {
@@ -615,8 +615,8 @@
           "method": "btree",
           "with": {}
         },
-        "reports_stream_occurred_idx": {
-          "name": "reports_stream_occurred_idx",
+        "reports_stream_received_idx": {
+          "name": "reports_stream_received_idx",
           "columns": [
             {
               "expression": "stream_id",
@@ -625,7 +625,7 @@
               "nulls": "last"
             },
             {
-              "expression": "occurred_at",
+              "expression": "received_at",
               "isExpression": false,
               "asc": false,
               "nulls": "last"

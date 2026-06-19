@@ -61,6 +61,9 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
     references: [workspaces.id],
   }),
   streams: many(streams),
+  // Reverse of sourcesRelations.categories — "which sources may write here",
+  // needed by scope/RBAC checks.
+  sourceGrants: many(sourceCategories),
 }));
 
 export const streamsRelations = relations(streams, ({ one, many }) => ({
@@ -70,6 +73,8 @@ export const streamsRelations = relations(streams, ({ one, many }) => ({
   }),
   reports: many(reports),
   metrics: many(reportMetrics),
+  // Reverse of sourcesRelations.streams — "which sources may write here".
+  sourceGrants: many(sourceStreams),
 }));
 
 export const reportsRelations = relations(reports, ({ one, many }) => ({

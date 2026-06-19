@@ -1,5 +1,5 @@
-import { boolean, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
-import { serverTimestamp } from './columns.js';
+import { boolean, pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
+import { serverTimestamp, utcTimestamp } from './columns.js';
 import { sourceScope } from './enums.js';
 import { categories } from './categories.js';
 import { streams } from './streams.js';
@@ -32,7 +32,7 @@ export const sources = pgTable('sources', {
   agentVersion: text('agent_version'),
   scope: sourceScope('scope').notNull().default('workspace'),
   allowStreamAutocreate: boolean('allow_stream_autocreate').notNull().default(true),
-  lastSeenAt: timestamp('last_seen_at', { withTimezone: true, mode: 'date' }),
+  lastSeenAt: utcTimestamp('last_seen_at'),
   createdAt: serverTimestamp('created_at'),
 });
 

@@ -1,4 +1,5 @@
-import { doublePrecision, index, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { doublePrecision, index, pgTable, text } from 'drizzle-orm/pg-core';
+import { utcTimestamp } from './columns.js';
 import { reports } from './reports.js';
 import { streams } from './streams.js';
 
@@ -23,7 +24,7 @@ export const reportMetrics = pgTable(
       .references(() => streams.id, { onDelete: 'cascade' }),
     key: text('key').notNull(),
     value: doublePrecision('value').notNull(),
-    occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).notNull(),
+    occurredAt: utcTimestamp('occurred_at').notNull(),
   },
   (t) => [index('report_metrics_stream_key_occurred_idx').on(t.streamId, t.key, t.occurredAt)],
 );

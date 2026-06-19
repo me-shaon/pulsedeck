@@ -81,7 +81,7 @@ CREATE TABLE "reports" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"tags" text[] DEFAULT '{}'::text[] NOT NULL,
 	"blocks" jsonb NOT NULL,
-	"search_vector" "tsvector"
+	"search_vector" "tsvector" NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "report_metrics" (
@@ -122,7 +122,7 @@ ALTER TABLE "dashboards" ADD CONSTRAINT "dashboards_workspace_id_workspaces_id_f
 CREATE UNIQUE INDEX "categories_workspace_slug_uq" ON "categories" USING btree ("workspace_id","slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "streams_category_slug_uq" ON "streams" USING btree ("category_id","slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "reports_source_idempotency_uq" ON "reports" USING btree ("source_id","idempotency_key");--> statement-breakpoint
-CREATE INDEX "reports_stream_occurred_idx" ON "reports" USING btree ("stream_id","occurred_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "reports_stream_received_idx" ON "reports" USING btree ("stream_id","received_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "reports_search_vector_idx" ON "reports" USING gin ("search_vector");--> statement-breakpoint
 CREATE INDEX "report_metrics_stream_key_occurred_idx" ON "report_metrics" USING btree ("stream_id","key","occurred_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "dashboards_workspace_slug_uq" ON "dashboards" USING btree ("workspace_id","slug");

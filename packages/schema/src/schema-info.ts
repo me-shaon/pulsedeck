@@ -1,3 +1,12 @@
+import {
+  chartVariantSchema,
+  columnTypeSchema,
+  formatSchema,
+  sentimentSchema,
+  severitySchema,
+  statusSchema,
+  trendSchema,
+} from './enums.js';
 import { LIMITS } from './limits.js';
 import { SCHEMA_VERSION } from './version.js';
 
@@ -33,14 +42,15 @@ export interface SchemaInfo {
 
 export const schemaInfo: SchemaInfo = {
   version: SCHEMA_VERSION,
+  // Derived from the Zod enums so the descriptor can never drift from validation.
   enums: {
-    severity: ['info', 'warning', 'critical'],
-    status: ['healthy', 'degraded', 'down', 'unknown'],
-    trend: ['up', 'down', 'flat'],
-    sentiment: ['positive', 'negative', 'neutral'],
-    format: ['number', 'currency', 'percent', 'bytes', 'duration'],
-    chart_variant: ['line', 'bar', 'area'],
-    column_type: ['string', 'number', 'date'],
+    severity: severitySchema.options,
+    status: statusSchema.options,
+    trend: trendSchema.options,
+    sentiment: sentimentSchema.options,
+    format: formatSchema.options,
+    chart_variant: chartVariantSchema.options,
+    column_type: columnTypeSchema.options,
   },
   limits: LIMITS,
   reportEnvelope: [

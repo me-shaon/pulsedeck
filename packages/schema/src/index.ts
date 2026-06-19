@@ -40,6 +40,7 @@ export {
   statusItemSchema,
   artifactBlockSchema,
   blockSchema,
+  blockSchemasByType,
   BLOCK_TYPES,
   type MetricBlock,
   type MarkdownBlock,

@@ -211,25 +211,22 @@ export const blockSchema = blockUnion.superRefine((block, ctx) => {
   }
 });
 
-export type Block =
-  | MetricBlock
-  | MarkdownBlock
-  | ChartBlock
-  | TableBlock
-  | TimelineBlock
-  | AlertBlock
-  | StatusBlock
-  | ArtifactBlock;
+/** Union of all block shapes. Derived from the schema so it can never drift. */
+export type Block = z.infer<typeof blockSchema>;
 
-/** The 8 canonical block type discriminants. */
-export const BLOCK_TYPES = [
-  'metric',
-  'markdown',
-  'chart',
-  'table',
-  'timeline',
-  'alert',
-  'status',
-  'artifact',
-] as const;
-export type BlockType = (typeof BLOCK_TYPES)[number];
+/** The block discriminant literals (`'metric' | … | 'artifact'`). */
+export type BlockType = Block['type'];
+
+/**
+ * Block schemas keyed by their `type` discriminant. Derived from the union so
+ * adding a member here is impossible to forget — callers (and the schema-info
+ * drift guard) introspect these `.shape`s directly.
+ */
+export const blockSchemasByType = Object.fromEntries(
+  blockUnion.options.map((option) => [option.shape.type.value, option]),
+) as Record<BlockType, (typeof blockUnion.options)[number]>;
+
+/** The 8 canonical block type discriminants, derived from the union order. */
+export const BLOCK_TYPES = blockUnion.options.map(
+  (option) => option.shape.type.value,
+) as readonly BlockType[];

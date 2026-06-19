@@ -18,6 +18,9 @@ const EnvSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   BOOTSTRAP_EMAIL: z.string().optional(),
   BOOTSTRAP_PASSWORD: z.string().optional(),
+  // Public origin better-auth uses to build OAuth callback URLs and validate
+  // origins. Optional: only needed for social login / cross-origin clients.
+  BETTER_AUTH_URL: z.string().url('BETTER_AUTH_URL must be a valid URL').optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -1,4 +1,7 @@
+import { createAuth } from './auth/auth.js';
+import { runBootstrap } from './auth/setup.js';
 import { createDb } from './db.js';
+import { createDrizzle } from './db/index.js';
 import { loadEnv, type Env } from './env.js';
 import { runMigrations } from './migrate.js';
 import { buildServer } from './server.js';
@@ -17,7 +20,14 @@ async function main(): Promise<void> {
   // Migrations must complete before we accept traffic.
   await runMigrations(sql);
 
-  const app = buildServer({ sql, logger: true });
+  const db = createDrizzle(sql);
+  const auth = createAuth(db, env);
+
+  // Headless first-run: seed the admin + workspace when BOOTSTRAP_* is set and
+  // there are zero users. Idempotent (no-op once any user exists).
+  await runBootstrap(db, auth, env);
+
+  const app = buildServer({ sql, logger: true, env, auth });
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
 
   // Close the server and drain the connection pool on container stop so

@@ -19,6 +19,17 @@ async function main(): Promise<void> {
 
   const app = buildServer({ sql, logger: true });
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
+
+  // Close the server and drain the connection pool on container stop so
+  // redeploys don't drop in-flight requests or leak connections.
+  const shutdown = async (signal: string): Promise<void> => {
+    app.log.info(`${signal} received, shutting down`);
+    await app.close();
+    await sql.end({ timeout: 5 });
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 main().catch((error) => {

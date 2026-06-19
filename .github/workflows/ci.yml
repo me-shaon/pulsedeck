@@ -2,7 +2,13 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Cancel superseded runs on the same ref instead of double-running PR branches.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
@@ -25,14 +31,13 @@ jobs:
 
     env:
       DATABASE_URL: postgres://pulsedeck:pulsedeck@localhost:5432/pulsedeck
-      AUTH_SECRET: ci-secret
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-32x
 
     steps:
       - uses: actions/checkout@v4
 
+      # version is read from the root package.json "packageManager" field.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -42,11 +47,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Format check
+        run: pnpm format:check
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Lint
         run: pnpm lint
+
+      - name: Build
+        run: pnpm build
 
       - name: Test
         run: pnpm test

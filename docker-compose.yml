@@ -5,12 +5,15 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
-      AUTH_SECRET: changeme
+      # Change this to a long random value (>=32 chars) before any real use.
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-secret-string}
       RETENTION_DAYS: 0
     ports:
       - '${API_PORT:-3001}:3001'
     depends_on:
-      - postgres # redis intentionally NOT required to boot
+      postgres:
+        condition: service_healthy # wait for DB readiness, not just container start
+      # redis intentionally NOT required to boot
 
   web:
     build:
@@ -29,6 +32,11 @@ services:
       - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pulsedeck']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine

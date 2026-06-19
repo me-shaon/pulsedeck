@@ -1,0 +1,18 @@
+# Keep build contexts lean and avoid copying host artifacts into images.
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.github
+.env
+.env.*
+**/*.tsbuildinfo
+coverage
+**/coverage
+.DS_Store
+
+# Local-only planning docs
+PRD.md
+BLOCK_SCHEMA.md
+IMPLEMENTATION_PLAN.md

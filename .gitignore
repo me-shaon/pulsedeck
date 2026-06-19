@@ -21,10 +21,11 @@ build/
 *.log
 npm-debug.log*
 
-# OS / editor
+# OS / editor / local agent config
 .DS_Store
 .idea/
 .vscode/
+.claude/
 *.swp
 
 # Test / coverage

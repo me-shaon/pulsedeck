@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { nanoid } from 'nanoid';
 
 /**
@@ -34,24 +34,6 @@ export function generateApiKey(): string {
 /** SHA-256 hex digest of a raw credential. The only form that touches the DB. */
 export function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
-}
-
-/**
- * Constant-time comparison of two hex digests. Lookups normally match the hash
- * directly in SQL (indexed, no app-side compare), but where a stored hash is
- * compared to a computed one in application code, use this to avoid leaking
- * match length via early-exit timing. Returns false on any length mismatch.
- */
-export function timingSafeEqualHex(a: string, b: string): boolean {
-  const ab = Buffer.from(a, 'hex');
-  const bb = Buffer.from(b, 'hex');
-  if (ab.length !== bb.length || ab.length === 0) return false;
-  return timingSafeEqual(ab, bb);
-}
-
-/** True when `raw` looks like a registration token (cheap shape check, not auth). */
-export function looksLikeRegToken(raw: string): boolean {
-  return raw.startsWith(REG_TOKEN_PREFIX);
 }
 
 /** True when `raw` looks like a source API key (cheap shape check, not auth). */

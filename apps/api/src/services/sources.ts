@@ -345,6 +345,8 @@ export interface SourceListItem {
   name: string;
   scope: SourceScope;
   agentVersion: string | null;
+  /** Wire-contract version the source publishes against (single-version in v1). */
+  schemaVersion: string;
   lastSeenAt: Date | null;
   reportCount: number;
   status: SourceHealth;
@@ -369,6 +371,7 @@ export async function listSources(db: Db, workspaceId: string): Promise<SourceLi
     name: s.name,
     scope: s.scope,
     agentVersion: s.agentVersion,
+    schemaVersion: SCHEMA_VERSION,
     lastSeenAt: s.lastSeenAt,
     reportCount: counts.get(s.id) ?? 0,
     status: sourceHealth(s.apiKeyHash, s.lastSeenAt, now),

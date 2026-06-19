@@ -267,22 +267,7 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(204).send();
     },
   );
-
-  /**
-   * Delete a source entirely. Cascades to its reports, scope grants, and
-   * registration tokens (FK ON DELETE CASCADE). Destructive — prefer revoke to
-   * preserve history.
-   */
-  app.delete(
-    '/api/v1/workspaces/:id/sources/:sourceId',
-    { preHandler: manage },
-    async (request, reply) => {
-      const { id: workspaceId, sourceId } = request.params as { id: string; sourceId: string };
-      const source = await loadSource(workspaceId, sourceId);
-      if (!source) return reply.code(404).send({ error: 'Source not found' });
-
-      await db.delete(sources).where(eq(sources.id, sourceId)); // FKs cascade reports/grants/tokens
-      return reply.code(204).send();
-    },
-  );
+  // No hard-delete endpoint: reports are immutable/append-only and removed only
+  // via retention (PRD), so a cascading source delete would be a backdoor around
+  // it. Use revoke to disable a source while preserving its history.
 }

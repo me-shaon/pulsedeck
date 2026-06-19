@@ -48,10 +48,13 @@ export function toWebRequest(request: FastifyRequest): Request {
   const protocol = (request.headers['x-forwarded-proto'] as string | undefined) ?? request.protocol;
   const url = new URL(request.url, `${protocol}://${host}`);
 
-  const init: RequestInit = {
-    method: request.method,
-    headers: toHeaders(request),
-  };
+  const headers = toHeaders(request);
+  // We re-serialize the parsed body, so the original framing headers no longer
+  // describe it — drop them to avoid a length/encoding mismatch.
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+
+  const init: RequestInit = { method: request.method, headers };
 
   if (request.method !== 'GET' && request.method !== 'HEAD' && request.body != null) {
     init.body = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);

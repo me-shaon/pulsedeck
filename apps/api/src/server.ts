@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { createAuth, type Auth, type AuthEnv } from './auth/auth.js';
 import { registerAuthHandler } from './auth/fastify.js';
 import { createDrizzle, type Db } from './db/index.js';
@@ -56,6 +56,14 @@ export function buildServer({
   // Default request decorations the auth preHandlers populate.
   app.decorateRequest('user', null);
   app.decorateRequest('workspaceRole', null);
+
+  // Generic error handler: log the real error server-side, return an opaque
+  // message so internal/driver/auth detail never leaks in the response body.
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    request.log.error(error);
+    const status = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
+    reply.status(status).send({ error: status >= 500 ? 'Internal Server Error' : error.message });
+  });
 
   // better-auth's own endpoints (sign-in/up, OAuth callbacks, sign-out, …).
   registerAuthHandler(app, authInstance);

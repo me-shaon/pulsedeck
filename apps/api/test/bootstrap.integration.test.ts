@@ -27,7 +27,7 @@ describeIfDb('headless bootstrap (integration)', () => {
   let auth: Auth;
 
   beforeAll(async () => {
-    sql = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
     await sql`TRUNCATE users, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
@@ -41,7 +41,7 @@ describeIfDb('headless bootstrap (integration)', () => {
   it('seeds the admin + Owner workspace on first run', async () => {
     expect(await isSetupRequired(db)).toBe(true);
 
-    const seeded = await runBootstrap(db, auth, BOOTSTRAP);
+    const seeded = await runBootstrap(db, sql, auth, BOOTSTRAP);
     expect(seeded).toBe(true);
 
     expect(await countUsers(db)).toBe(1);
@@ -57,13 +57,13 @@ describeIfDb('headless bootstrap (integration)', () => {
   });
 
   it('is a no-op on restart (does not double-seed)', async () => {
-    const seededAgain = await runBootstrap(db, auth, BOOTSTRAP);
+    const seededAgain = await runBootstrap(db, sql, auth, BOOTSTRAP);
     expect(seededAgain).toBe(false);
     expect(await countUsers(db)).toBe(1);
   });
 
   it('does nothing when BOOTSTRAP_* is unset', async () => {
-    const res = await runBootstrap(db, auth, {});
+    const res = await runBootstrap(db, sql, auth, {});
     expect(res).toBe(false);
   });
 });

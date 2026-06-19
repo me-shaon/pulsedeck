@@ -1,8 +1,20 @@
-import { count } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import type { Db } from '../db/index.js';
 import { users, type Workspace } from '../db/index.js';
+import type { Sql } from '../db.js';
 import { createWorkspaceWithOwner } from '../services/workspaces.js';
 import type { Auth } from './auth.js';
+
+/** Advisory-lock key serializing first-admin provisioning across requests/replicas. */
+const ADMIN_PROVISION_LOCK = 4242;
+
+/** Thrown when provisioning loses the zero-users race (another admin already exists). */
+export class SetupAlreadyCompletedError extends Error {
+  constructor() {
+    super('Setup has already been completed');
+    this.name = 'SetupAlreadyCompletedError';
+  }
+}
 
 /**
  * First-run onboarding + headless bootstrap.
@@ -42,22 +54,54 @@ export interface ProvisionedAdmin {
  * Returns the better-auth response headers so the caller can forward the
  * session cookie (the new admin is signed in immediately).
  *
- * Callers MUST gate this on {@link isSetupRequired}; it does not re-check.
+ * Concurrency-safe: a Postgres advisory lock serializes provisioning and the
+ * zero-users check is re-run while holding it, so two concurrent `/setup` calls
+ * (or replicas booting at once) can never both create an admin — the loser gets
+ * {@link SetupAlreadyCompletedError}. If workspace creation fails after the
+ * better-auth user is committed (on its own connection), the orphan user is
+ * deleted so setup remains available rather than permanently self-disabling.
  */
 export async function provisionFirstAdmin(
   db: Db,
+  sql: Sql,
   auth: Auth,
   input: AdminInput,
 ): Promise<ProvisionedAdmin> {
-  const { response, headers } = await auth.api.signUpEmail({
-    body: { name: input.name, email: input.email, password: input.password },
-    returnHeaders: true,
-  });
+  // Hold a session-level advisory lock on a dedicated connection (NOT a
+  // transaction — better-auth manages its own DB access and deadlocks if nested
+  // inside one). This serializes provisioning so the zero-users re-check below
+  // is authoritative: a concurrent loser sees a user and gets the typed error.
+  const conn = await sql.reserve();
+  let createdUserId: string | undefined;
+  try {
+    await conn`SELECT pg_advisory_lock(${ADMIN_PROVISION_LOCK})`;
 
-  const userId = response.user.id;
-  const workspace = await createWorkspaceWithOwner(db, userId, `${input.name}'s Workspace`);
+    if ((await countUsers(db)) > 0) throw new SetupAlreadyCompletedError();
 
-  return { userId, workspace, headers };
+    const { response, headers } = await auth.api.signUpEmail({
+      body: { name: input.name, email: input.email, password: input.password },
+      returnHeaders: true,
+    });
+    createdUserId = response.user.id;
+
+    const workspace = await createWorkspaceWithOwner(
+      db,
+      createdUserId,
+      `${input.name}'s Workspace`,
+    );
+    return { userId: createdUserId, workspace, headers };
+  } catch (err) {
+    // If workspace creation failed after better-auth committed the user, remove
+    // the orphan so the zero-users condition (and /setup) is restored rather
+    // than permanently self-disabling. Skip when the guard tripped (no user).
+    if (createdUserId && !(err instanceof SetupAlreadyCompletedError)) {
+      await db.delete(users).where(eq(users.id, createdUserId));
+    }
+    throw err;
+  } finally {
+    await conn`SELECT pg_advisory_unlock(${ADMIN_PROVISION_LOCK})`.catch(() => {});
+    conn.release();
+  }
 }
 
 /**
@@ -68,16 +112,25 @@ export async function provisionFirstAdmin(
  */
 export async function runBootstrap(
   db: Db,
+  sql: Sql,
   auth: Auth,
   env: { BOOTSTRAP_EMAIL?: string; BOOTSTRAP_PASSWORD?: string },
 ): Promise<boolean> {
   if (!env.BOOTSTRAP_EMAIL || !env.BOOTSTRAP_PASSWORD) return false;
   if (!(await isSetupRequired(db))) return false;
 
-  await provisionFirstAdmin(db, auth, {
-    name: 'Admin',
-    email: env.BOOTSTRAP_EMAIL,
-    password: env.BOOTSTRAP_PASSWORD,
-  });
-  return true;
+  try {
+    await provisionFirstAdmin(db, sql, auth, {
+      name: 'Admin',
+      email: env.BOOTSTRAP_EMAIL,
+      password: env.BOOTSTRAP_PASSWORD,
+    });
+    return true;
+  } catch (err) {
+    // Another replica won the provisioning race — expected, not a failure, so
+    // this replica boots normally. Any OTHER error (e.g. invalid bootstrap
+    // credentials) is a real misconfiguration and is surfaced to crash startup.
+    if (err instanceof SetupAlreadyCompletedError) return false;
+    throw err;
+  }
 }

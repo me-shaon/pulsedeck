@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { isGithubEnabled } from '../auth/auth.js';
-import { isSetupRequired, provisionFirstAdmin } from '../auth/setup.js';
+import { isSetupRequired, provisionFirstAdmin, SetupAlreadyCompletedError } from '../auth/setup.js';
 
 /**
  * Public auth-adjacent endpoints (no session required):
@@ -45,7 +45,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Invalid request', issues: parsed.error.issues });
     }
 
-    const { userId, workspace, headers } = await provisionFirstAdmin(app.db, app.auth, parsed.data);
+    let provisioned;
+    try {
+      provisioned = await provisionFirstAdmin(app.db, app.sql, app.auth, parsed.data);
+    } catch (err) {
+      // Lost the first-run race to a concurrent request — setup is now done.
+      if (err instanceof SetupAlreadyCompletedError) {
+        return reply.code(409).send({ error: 'Setup has already been completed' });
+      }
+      throw err;
+    }
+    const { userId, workspace, headers } = provisioned;
 
     // Forward better-auth's session cookie so the new admin is logged in.
     const setCookies = headers.getSetCookie?.() ?? [];

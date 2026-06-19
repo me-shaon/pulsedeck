@@ -25,7 +25,7 @@ async function main(): Promise<void> {
 
   // Headless first-run: seed the admin + workspace when BOOTSTRAP_* is set and
   // there are zero users. Idempotent (no-op once any user exists).
-  await runBootstrap(db, auth, env);
+  await runBootstrap(db, sql, auth, env);
 
   const app = buildServer({ sql, logger: true, env, auth });
   await app.listen({ port: env.PORT, host: '0.0.0.0' });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { can, requireRole, type Action, type Role } from '../src/auth/rbac.js';
+import { can, canGrantRole, requireRole, type Action, type Role } from '../src/auth/rbac.js';
 import { isGithubEnabled } from '../src/auth/auth.js';
 
 /**
@@ -38,6 +38,22 @@ describe('requireRole', () => {
   });
   it('throws when denied', () => {
     expect(() => requireRole('viewer', 'workspace:delete')).toThrow();
+  });
+});
+
+describe('canGrantRole — privilege ceiling', () => {
+  it('an owner may grant any role (including owner)', () => {
+    for (const r of ROLES) expect(canGrantRole('owner', r)).toBe(true);
+  });
+  it('an admin may grant admin/editor/viewer but NOT owner', () => {
+    expect(canGrantRole('admin', 'owner')).toBe(false);
+    expect(canGrantRole('admin', 'admin')).toBe(true);
+    expect(canGrantRole('admin', 'editor')).toBe(true);
+    expect(canGrantRole('admin', 'viewer')).toBe(true);
+  });
+  it('a granter can never hand out a role above their own', () => {
+    expect(canGrantRole('editor', 'admin')).toBe(false);
+    expect(canGrantRole('viewer', 'editor')).toBe(false);
   });
 });
 

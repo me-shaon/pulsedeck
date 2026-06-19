@@ -47,7 +47,22 @@ const POLICY: Record<Action, readonly Role[]> = {
 
 /** True when `role` is permitted to perform `action` per the PRD matrix. */
 export function can(role: Role, action: Action): boolean {
-  return POLICY[action].includes(role);
+  // `?? []` is an explicit default-deny for an unknown action (unreachable while
+  // `action` is typed, but fails closed rather than throwing if it ever isn't).
+  return (POLICY[action] ?? []).includes(role);
+}
+
+/** Privilege ordering, used only to cap which role a granter may hand out. */
+const ROLE_RANK: Record<Role, number> = { owner: 3, admin: 2, editor: 1, viewer: 0 };
+
+/**
+ * Whether a member holding `granterRole` may assign or invite `targetRole`.
+ * A granter can never hand out a role above their own — this stops an Admin
+ * (who holds `members:manage`) from minting or promoting an Owner and thereby
+ * escalating past every Owner-only action.
+ */
+export function canGrantRole(granterRole: Role, targetRole: Role): boolean {
+  return ROLE_RANK[targetRole] <= ROLE_RANK[granterRole];
 }
 
 /**

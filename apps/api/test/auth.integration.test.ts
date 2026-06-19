@@ -59,7 +59,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   let memberUserId: string;
 
   beforeAll(async () => {
-    sql = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
 
@@ -133,7 +133,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   });
 
   it('bootstrap is idempotent — no-op once a user exists', async () => {
-    const seeded = await runBootstrap(db, auth, {
+    const seeded = await runBootstrap(db, sql, auth, {
       BOOTSTRAP_EMAIL: 'bootstrap@example.com',
       BOOTSTRAP_PASSWORD: 'supersecret4',
     });

@@ -19,6 +19,30 @@ function slugStem(name: string): string {
   return stem || 'workspace';
 }
 
+/** A Drizzle transaction handle (the argument to `db.transaction`). */
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+/**
+ * Insert a workspace + its Owner membership using an existing transaction.
+ * Exposed so callers that already hold a transaction (e.g. first-admin
+ * provisioning under an advisory lock) can compose this atomically.
+ */
+export async function insertWorkspaceWithOwner(
+  tx: Tx,
+  ownerId: string,
+  name: string,
+): Promise<Workspace> {
+  const workspaceId = id('ws');
+  const slug = `${slugStem(name)}-${nanoid(6).toLowerCase()}`;
+
+  const [workspace] = await tx
+    .insert(workspaces)
+    .values({ id: workspaceId, name, slug })
+    .returning();
+  await tx.insert(workspaceMembers).values({ workspaceId, userId: ownerId, role: 'owner' });
+  return workspace as Workspace;
+}
+
 /**
  * Create a workspace and make `ownerId` its Owner, atomically. The slug is the
  * name's stem plus a short random suffix to satisfy the unique constraint
@@ -29,17 +53,5 @@ export async function createWorkspaceWithOwner(
   ownerId: string,
   name: string,
 ): Promise<Workspace> {
-  const workspaceId = id('ws');
-  const slug = `${slugStem(name)}-${nanoid(6).toLowerCase()}`;
-
-  return db.transaction(async (tx) => {
-    const [workspace] = await tx
-      .insert(workspaces)
-      .values({ id: workspaceId, name, slug })
-      .returning();
-
-    await tx.insert(workspaceMembers).values({ workspaceId, userId: ownerId, role: 'owner' });
-
-    return workspace as Workspace;
-  });
+  return db.transaction((tx) => insertWorkspaceWithOwner(tx, ownerId, name));
 }

@@ -1,7 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { canGrantRole } from '../auth/rbac.js';
 import { makeRequireAuth, makeRequireWorkspaceRole } from '../auth/fastify.js';
 import { id, invites, users, workspaceMembers, workspaces } from '../db/index.js';
 import { createWorkspaceWithOwner } from '../services/workspaces.js';
@@ -139,6 +140,11 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'Invalid request', issues: parsed.error.issues });
       }
 
+      // Cannot promote a member to a role above the caller's own (privilege ceiling).
+      if (!canGrantRole(request.workspaceRole!, parsed.data.role)) {
+        return reply.code(403).send({ error: 'Cannot grant a role higher than your own' });
+      }
+
       const [target] = await db
         .select({ role: workspaceMembers.role })
         .from(workspaceMembers)
@@ -207,6 +213,11 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
       const parsed = CreateInviteBody.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: 'Invalid request', issues: parsed.error.issues });
+      }
+
+      // A granter cannot invite a role above their own (e.g. an Admin minting an Owner).
+      if (!canGrantRole(request.workspaceRole!, parsed.data.role)) {
+        return reply.code(403).send({ error: 'Cannot grant a role higher than your own' });
       }
 
       const token = nanoid(32);
@@ -278,13 +289,23 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
       .where(eq(invites.token, parsed.data.token))
       .limit(1);
     if (!invite) return reply.code(404).send({ error: 'Invite not found' });
-    if (invite.acceptedAt) return reply.code(409).send({ error: 'Invite already used' });
     if (invite.expiresAt.getTime() < Date.now()) {
       return reply.code(410).send({ error: 'Invite expired' });
     }
 
     const userId = request.user!.id;
-    await db.transaction(async (tx) => {
+    // Single-use enforcement is an atomic compare-and-swap: the UPDATE only
+    // matches while `accepted_at IS NULL`, so of two concurrent accepts of the
+    // same token exactly one consumes it; the loser sees 0 rows → 409. The
+    // membership write is gated on winning, all inside one transaction.
+    const consumed = await db.transaction(async (tx) => {
+      const claimed = await tx
+        .update(invites)
+        .set({ acceptedAt: new Date() })
+        .where(and(eq(invites.id, invite.id), isNull(invites.acceptedAt)))
+        .returning({ id: invites.id });
+      if (claimed.length === 0) return false;
+
       await tx
         .insert(workspaceMembers)
         .values({ workspaceId: invite.workspaceId, userId, role: invite.role })
@@ -292,9 +313,10 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
           target: [workspaceMembers.workspaceId, workspaceMembers.userId],
           set: { role: invite.role },
         });
-      await tx.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+      return true;
     });
 
+    if (!consumed) return reply.code(409).send({ error: 'Invite already used' });
     return reply.send({ workspaceId: invite.workspaceId, role: invite.role });
   });
 }

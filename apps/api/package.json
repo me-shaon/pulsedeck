@@ -16,6 +16,7 @@
     "db:studio": "node --import tsx ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^10.0.0",
     "@pulsedeck/schema": "workspace:*",
     "better-auth": "^1.2.7",
     "dotenv": "^16.4.7",

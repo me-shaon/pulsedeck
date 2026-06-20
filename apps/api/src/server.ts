@@ -3,8 +3,10 @@ import { createAuth, type Auth, type AuthEnv } from './auth/auth.js';
 import { registerAuthHandler } from './auth/fastify.js';
 import { createDrizzle, type Db } from './db/index.js';
 import type { Sql } from './db.js';
+import { ingestionBus } from './events/ingestion.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 
@@ -53,6 +55,9 @@ export function buildServer({
   app.decorate('db', dbInstance);
   app.decorate('auth', authInstance);
   app.decorate('authEnv', env);
+  // In-process ingestion event bus; the SSE/webhook fan-out attaches here later
+  // and Phase 10 can swap the singleton for a Redis-backed bus transparently.
+  app.decorate('ingestionBus', ingestionBus);
 
   // Default request decorations the auth preHandlers populate.
   app.decorateRequest('user', null);
@@ -75,6 +80,7 @@ export function buildServer({
   app.register(authRoutes);
   app.register(workspaceRoutes);
   app.register(sourceRoutes);
+  app.register(reportRoutes);
 
   return app;
 }

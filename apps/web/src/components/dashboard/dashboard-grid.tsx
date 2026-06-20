@@ -36,7 +36,12 @@ export function DashboardGrid({
       {widgets.map((widget, index) => {
         const meta = widgetTypeMeta(widget.type);
         return (
-          <div key={widget.id} className={SPAN_CLASS[widget.span]}>
+          // Key by id + config so reconfiguring a crashed widget remounts it
+          // (and its error boundary), clearing a prior render error.
+          <div
+            key={`${widget.id}:${JSON.stringify(widget.config)}`}
+            className={SPAN_CLASS[widget.span]}
+          >
             <WidgetShell
               title={lookup.widgetTitle(widget)}
               icon={meta.icon}

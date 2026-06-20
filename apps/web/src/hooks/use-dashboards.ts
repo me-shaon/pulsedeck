@@ -76,7 +76,13 @@ export function useDashboardMutations(wsId: string) {
 
   const makeDefault = useMutation({
     mutationFn: (dashId: string) => setDefaultDashboard(wsId, dashId),
-    onSuccess: () => invalidateList(),
+    onSuccess: () => {
+      invalidateList();
+      // Setting a default flips `isDefault` on BOTH the new and the previous
+      // default's DETAIL query — prefix-invalidate every dashboard detail in
+      // this workspace so an open page's "Default" badge isn't stale.
+      qc.invalidateQueries({ queryKey: ['dashboard', wsId] });
+    },
   });
 
   const remove = useMutation({

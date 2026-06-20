@@ -342,6 +342,15 @@ describeIfDb('reports read APIs (integration)', () => {
     expect(res.json().error).toBe('invalid_query');
   });
 
+  it('crafted cursor with a JS-parseable but non-ISO timestamp → 400 (not 500)', async () => {
+    // `2026` parses in JS Date but would make Postgres `::timestamptz` raise; the
+    // strict-format guard must reject it as a clean 400 before it reaches the DB.
+    const crafted = Buffer.from('2026|rpt_whatever', 'utf8').toString('base64url');
+    const res = await get(`/api/v1/workspaces/${workspaceId}/reports?cursor=${crafted}`);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_query');
+  });
+
   // --- Filters ---------------------------------------------------------------
 
   it('severity filter returns only matching reports', async () => {

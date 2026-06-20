@@ -72,22 +72,24 @@ export function encodeCursor(receivedAtText: string, id: string): string {
   return Buffer.from(`${receivedAtText}|${id}`, 'utf8').toString('base64url');
 }
 
+/** Exact shape `encodeCursor` emits: `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`. */
+const CURSOR_TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
 /** Decode a cursor, returning null when malformed (the route answers 400). */
 export function decodeCursor(raw: string): Cursor | null {
-  let decoded: string;
-  try {
-    decoded = Buffer.from(raw, 'base64url').toString('utf8');
-  } catch {
-    return null;
-  }
+  // `Buffer.from(_, 'base64url')` never throws — it silently drops invalid
+  // characters — so garbage decodes to garbage and is caught by the checks below.
+  const decoded = Buffer.from(raw, 'base64url').toString('utf8');
   const sep = decoded.indexOf('|');
   if (sep <= 0) return null;
   const receivedAtText = decoded.slice(0, sep);
   const id = decoded.slice(sep + 1);
-  if (!receivedAtText || !id) return null;
-  // Reject a timestamp the DB couldn't parse (a `::timestamptz` cast error would
-  // otherwise surface as a 500 instead of a clean 400).
-  if (Number.isNaN(new Date(receivedAtText).getTime())) return null;
+  if (!id) return null;
+  // Validate the timestamp against the EXACT emitted format, not just
+  // `Date.parse`: a lax value like `2026` parses in JS but makes Postgres'
+  // `::timestamptz` cast raise (→ a 500). Strict match keeps it a clean 400 and
+  // means the cursor is always a self-generated token, never free-form input.
+  if (!CURSOR_TS_RE.test(receivedAtText)) return null;
   return { receivedAtText, id };
 }
 
@@ -186,7 +188,14 @@ const cursorTsExpr = sql<string>`to_char(${reports.receivedAt} AT TIME ZONE 'UTC
 /** Block count without shipping the `blocks` JSONB to a list response. */
 const blockCountExpr = sql<number>`jsonb_array_length(${reports.blocks})`;
 
-/** The column set every summary row selects (joined, so no per-row N+1). */
+/**
+ * The column set every summary row selects (joined, so no per-row N+1).
+ * INVARIANT: any raw `sql<T>` added here must be `string` or `number` only, and
+ * `T` must match what postgres-js actually returns for that expression (e.g.
+ * `count(...)::int` → number, `max(timestamptz)`/`to_char(...)` → string). A raw
+ * `sql<Date>` would lie — the row type is asserted at the query boundary, so a
+ * mismatch is silent until it blows up at use (see the `lastReportAt` fix).
+ */
 const summaryColumns = {
   id: reports.id,
   title: reports.title,

@@ -1,21 +1,16 @@
 import { sql } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
+import type { DashboardLayout } from '../../dashboards/layout-schema.js';
 import { serverTimestamp } from './columns.js';
 import { workspaces } from './workspaces.js';
 
 /**
- * A single widget placed on a dashboard's 12-column grid (PRD "Dashboards &
- * Navigation"). Kept intentionally loose at the DB layer — the widget config
- * contract is validated/rendered in later phases. Stored inside `layout`.
+ * The widget-grid `layout` contract (the versioned `{ version, widgets[] }`
+ * envelope) is defined and validated in `src/dashboards/layout-schema.ts`. The
+ * column is typed with the inferred {@link DashboardLayout} here (a type-only
+ * import, so the DB schema stays runtime-decoupled from app code and drizzle-kit
+ * is unaffected). Reads normalize legacy/bare values via `normalizeLayout`.
  */
-export interface DashboardWidget {
-  id: string;
-  type: 'stream_feed' | 'metric' | 'chart' | 'report_count' | 'alert_feed';
-  /** Column span on the 12-col grid (e.g. 12 = full, 6 = half, 4 = third). */
-  span: number;
-  /** Widget-specific configuration (source stream/category, metric key, etc.). */
-  config: Record<string, unknown>;
-}
 
 /**
  * Dashboards — user-curated grid pages within a workspace. One per workspace is
@@ -36,7 +31,7 @@ export const dashboards = pgTable(
     position: integer('position').notNull().default(0),
     isDefault: boolean('is_default').notNull().default(false),
     layout: jsonb('layout')
-      .$type<DashboardWidget[]>()
+      .$type<DashboardLayout>()
       .notNull()
       .default(sql`'[]'::jsonb`),
     createdAt: serverTimestamp('created_at'),

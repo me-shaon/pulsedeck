@@ -5,6 +5,7 @@ import { createDrizzle, type Db } from './db/index.js';
 import type { Sql } from './db.js';
 import { ingestionBus } from './events/ingestion.js';
 import { authRoutes } from './routes/auth.js';
+import { dashboardRoutes } from './routes/dashboards.js';
 import { healthRoutes } from './routes/health.js';
 import { reportReadRoutes } from './routes/reports-read.js';
 import { reportRoutes } from './routes/reports.js';
@@ -83,6 +84,7 @@ export function buildServer({
   app.register(sourceRoutes);
   app.register(reportRoutes);
   app.register(reportReadRoutes);
+  app.register(dashboardRoutes);
 
   return app;
 }

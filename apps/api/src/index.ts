@@ -34,11 +34,18 @@ async function main(): Promise<void> {
     auth,
     redisUrl: env.REDIS_URL,
     sseEnabled: env.SSE_ENABLED,
+    retentionDays: env.RETENTION_DAYS,
+    retentionSweepIntervalMs: env.RETENTION_SWEEP_INTERVAL_MS,
   });
   // Connect the realtime Redis tier when REDIS_URL is set; a no-op otherwise.
   // start() never throws — a Redis failure logs and degrades to single-instance.
   await app.realtime.start();
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
+
+  // Arm the retention sweep AFTER we're listening. No-op when RETENTION_DAYS=0;
+  // otherwise the advisory lock keeps it single-run across replicas. The timer
+  // is unref()'d, so it never blocks the graceful shutdown below.
+  app.retention.start();
 
   // Close the server and drain the connection pool on container stop so
   // redeploys don't drop in-flight requests or leak connections.

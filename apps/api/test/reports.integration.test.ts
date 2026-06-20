@@ -166,6 +166,8 @@ describeIfDb('reports: ingestion API (integration)', () => {
     expect(row.blocks[0]).toMatchObject({ type: 'metric', key: 'api_latency', value: 421 });
     expect(row.receivedAt).toBeInstanceOf(Date);
     expect(row.sourceId).toBe(wsSourceId);
+    // workspace_id is denormalized from the authenticated source at ingest.
+    expect(row.workspaceId).toBe(workspaceId);
     // occurred_at is agent-supplied and preserved verbatim.
     expect(row.occurredAt.toISOString()).toBe('2026-05-22T10:00:00.000Z');
 

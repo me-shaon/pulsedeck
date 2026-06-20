@@ -13,6 +13,9 @@ const EnvSchema = z.object({
   // Optional — sensible defaults.
   PORT: z.coerce.number().int().positive().default(3001),
   RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
+  // How often the in-process retention sweep runs (ms). Only meaningful when
+  // RETENTION_DAYS > 0. Default 1h. Min 1s so a misconfig can't busy-loop.
+  RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().min(1000).default(3_600_000),
   REDIS_URL: z.string().url('REDIS_URL must be a valid connection URL').optional(),
   // Realtime SSE master switch (PRD §7 "SSE on/off"). Default ON: the endpoint is
   // available and clients live-update. Set to a falsy value (false/0/no/off) to

@@ -38,3 +38,38 @@ describe('GET /healthz', () => {
     await app.close();
   });
 });
+
+describe('GET /healthz/retention', () => {
+  it('reports retention disabled by default (RETENTION_DAYS unset → 0)', async () => {
+    const app = buildServer({ sql: reachableSql, db: stubDb, auth: stubAuth });
+    const res = await app.inject({ method: 'GET', url: '/healthz/retention' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.enabled).toBe(false);
+    expect(body.retentionDays).toBe(0);
+    expect(body.lastRunAt).toBeNull();
+    expect(body.lastOutcome).toBeNull();
+
+    await app.close();
+  });
+
+  it('reports retention enabled when a positive window is configured', async () => {
+    const app = buildServer({
+      sql: reachableSql,
+      db: stubDb,
+      auth: stubAuth,
+      retentionDays: 30,
+      retentionSweepIntervalMs: 3_600_000,
+    });
+    const res = await app.inject({ method: 'GET', url: '/healthz/retention' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.enabled).toBe(true);
+    expect(body.retentionDays).toBe(30);
+    expect(body.sweepIntervalMs).toBe(3_600_000);
+
+    await app.close();
+  });
+});

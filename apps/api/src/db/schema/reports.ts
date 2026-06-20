@@ -5,6 +5,7 @@ import { serverTimestamp, tsvector, utcTimestamp } from './columns.js';
 import { reportSeverity } from './enums.js';
 import { sources } from './sources.js';
 import { streams } from './streams.js';
+import { workspaces } from './workspaces.js';
 
 /**
  * Reports — immutable, append-only report instances published by a source
@@ -34,6 +35,16 @@ export const reports = pgTable(
     streamId: text('stream_id')
       .notNull()
       .references(() => streams.id, { onDelete: 'cascade' }),
+    // Denormalized owning workspace (Phase 11 perf follow-up). A report's
+    // workspace is derivable via `stream_id → categories.workspace_id`, but the
+    // workspace-wide "All Reports" list scopes by workspace and orders by
+    // `received_at`; carrying `workspace_id` here lets a single composite index
+    // `(workspace_id, received_at DESC, id DESC)` serve that keyset directly,
+    // instead of full-sorting after a streams→categories join. Populated at
+    // ingest from the authenticated source's workspace; cascades on delete.
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
     sourceId: text('source_id')
       .notNull()
       .references(() => sources.id, { onDelete: 'cascade' }),
@@ -61,6 +72,10 @@ export const reports = pgTable(
     // Stream feed orders by server time (`received_at`), matching retention and
     // the realtime arrival order; `occurred_at` is agent-supplied and untrusted.
     index('reports_stream_received_idx').on(t.streamId, t.receivedAt.desc()),
+    // Workspace-wide "All Reports" keyset: scope by workspace, page newest-first
+    // on the `(received_at, id)` tiebroken order. Mirrors the stream-feed index
+    // but at workspace granularity so the cross-stream list never full-sorts.
+    index('reports_workspace_received_idx').on(t.workspaceId, t.receivedAt.desc(), t.id.desc()),
     index('reports_search_vector_idx').using('gin', t.searchVector),
   ],
 );

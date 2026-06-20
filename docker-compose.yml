@@ -7,7 +7,10 @@ services:
       DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
       # Change this to a long random value (>=32 chars) before any real use.
       AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-secret-string}
-      RETENTION_DAYS: 0
+      # Report retention: 0 = keep forever (default). Set >0 to purge reports
+      # older than N days; the sweep is single-run across replicas (advisory lock).
+      RETENTION_DAYS: ${RETENTION_DAYS:-0}
+      RETENTION_SWEEP_INTERVAL_MS: ${RETENTION_SWEEP_INTERVAL_MS:-3600000}
     ports:
       - '${API_PORT:-3001}:3001'
     depends_on:

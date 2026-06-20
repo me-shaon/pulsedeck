@@ -295,6 +295,10 @@ export async function ingestReport(
       .values({
         id: reportId,
         streamId: dest.stream.id,
+        // Denormalized owning workspace, taken from the AUTHENTICATED source
+        // (never the request body) — a source is workspace-bound, so this is the
+        // authoritative scope. Powers the workspace-wide list's composite index.
+        workspaceId: source.workspaceId,
         sourceId: source.id,
         idempotencyKey,
         title: meta.title,

@@ -97,6 +97,8 @@ describeIfDb('reports read APIs (integration)', () => {
     receivedAt: Date;
     blocks?: number;
     source?: string;
+    /** Owning workspace; defaults to ws1. Pass ws2 for the foreign-isolation seed. */
+    workspaceId?: string;
   }): Promise<string> {
     const rid = id('rpt');
     const tags = opts.tags ?? [];
@@ -104,6 +106,7 @@ describeIfDb('reports read APIs (integration)', () => {
     await db.insert(reports).values({
       id: rid,
       streamId: opts.streamId,
+      workspaceId: opts.workspaceId ?? workspaceId,
       sourceId: opts.source ?? sourceId,
       idempotencyKey: rid,
       title: opts.title,
@@ -257,6 +260,9 @@ describeIfDb('reports read APIs (integration)', () => {
       receivedAt: new Date('2026-02-01T00:00:00Z'),
       source: srcOther,
       blocks: 1,
+      // Tag it with its real owning workspace (ws2). The list now scopes on
+      // reports.workspace_id, so this is what keeps it out of ws1's results.
+      workspaceId: ws2,
     });
   });
 

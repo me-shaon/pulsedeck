@@ -96,6 +96,7 @@ describeIfDb('dashboards + widget-data APIs (integration)', () => {
     await db.insert(reports).values({
       id: rid,
       streamId: opts.streamId,
+      workspaceId,
       sourceId: opts.source ?? sourceId,
       idempotencyKey: rid,
       title: opts.title,

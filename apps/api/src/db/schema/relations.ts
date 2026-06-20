@@ -19,6 +19,7 @@ export const workspacesRelations = relations(workspaces, ({ many }) => ({
   sources: many(sources),
   categories: many(categories),
   dashboards: many(dashboards),
+  reports: many(reports),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -89,6 +90,10 @@ export const streamsRelations = relations(streams, ({ one, many }) => ({
 export const reportsRelations = relations(reports, ({ one, many }) => ({
   stream: one(streams, { fields: [reports.streamId], references: [streams.id] }),
   source: one(sources, { fields: [reports.sourceId], references: [sources.id] }),
+  workspace: one(workspaces, {
+    fields: [reports.workspaceId],
+    references: [workspaces.id],
+  }),
   metrics: many(reportMetrics),
 }));
 

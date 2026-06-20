@@ -13,6 +13,7 @@ import { reportReadRoutes } from './routes/reports-read.js';
 import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
 import { workspaceRoutes } from './routes/workspaces.js';
+import { createRetentionRunner, type RetentionRunner } from './retention/index.js';
 
 // Shared singletons are decorated onto the app so every route/plugin reads them
 // off `app` instead of re-threading them through registration options.
@@ -23,6 +24,8 @@ declare module 'fastify' {
     auth: Auth;
     /** Auth-relevant env, exposed so `/auth/config` can report capabilities. */
     authEnv: AuthEnv;
+    /** Retention sweep runner; `start()`ed in index.ts, status read by /healthz. */
+    retention: RetentionRunner;
   }
 }
 
@@ -43,6 +46,13 @@ export interface BuildServerOptions {
   /** Pre-built realtime layer; defaults to `createRealtime({ bus, redisUrl })`.
    * Injectable so tests can supply a fake or a Redis-backed instance. */
   realtime?: Realtime;
+  /** Retention window in days (env `RETENTION_DAYS`). 0/omitted → disabled. */
+  retentionDays?: number;
+  /** Retention sweep cadence in ms (env `RETENTION_SWEEP_INTERVAL_MS`). */
+  retentionSweepIntervalMs?: number;
+  /** Pre-built retention runner; defaults to `createRetentionRunner(...)`.
+   * Injectable so tests can supply a fake. NOT auto-started by buildServer. */
+  retention?: RetentionRunner;
 }
 
 /**
@@ -59,6 +69,9 @@ export function buildServer({
   redisUrl,
   sseEnabled = true,
   realtime,
+  retentionDays = 0,
+  retentionSweepIntervalMs = 3_600_000,
+  retention,
 }: BuildServerOptions): FastifyInstance {
   const app = Fastify({ logger });
 
@@ -93,6 +106,29 @@ export function buildServer({
   app.decorate('sseEnabled', sseEnabled);
   app.addHook('onClose', async () => {
     await realtimeInstance.close();
+  });
+
+  // In-process retention sweep (PRD "Report Retention"). Created here so the
+  // health route can read its status, but NOT started — index.ts calls
+  // `app.retention.start()` after the server is listening. Disabled when
+  // retentionDays is 0, so a default app (and every test) never schedules a
+  // destructive job. Stopped on close so timers don't outlive the app.
+  const retentionInstance =
+    retention ??
+    createRetentionRunner({
+      db: dbInstance,
+      sql,
+      retentionDays,
+      sweepIntervalMs: retentionSweepIntervalMs,
+      logger: {
+        info: (o, m) => app.log.info(o, m),
+        warn: (o, m) => app.log.warn(o, m),
+        error: (o, m) => app.log.error(o, m),
+      },
+    });
+  app.decorate('retention', retentionInstance);
+  app.addHook('onClose', async () => {
+    retentionInstance.stop();
   });
 
   // Default request decorations the auth preHandlers populate.

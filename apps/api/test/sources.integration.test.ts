@@ -331,6 +331,7 @@ describeIfDb('sources: registration & management (integration)', () => {
     await db.insert(reports).values({
       id: id('rpt'),
       streamId: stmId,
+      workspaceId,
       sourceId,
       idempotencyKey: 'k1',
       title: 'Build report',

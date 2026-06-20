@@ -10,11 +10,13 @@ import { categories, reports, sources, streams } from '../db/index.js';
  * layer stays thin and the query correctness (keyset pagination, full-text
  * search, workspace scoping, N+1 avoidance) lives in one testable place.
  *
- * Workspace scoping is structural: every query joins
- * `reports → streams → categories` and filters `categories.workspace_id`, so a
- * report/stream/category from another workspace can never appear or be
- * addressable. The route's `reports:view` gate (allowed to all roles) plus this
- * scoping mean any member reads, a non-member 404s at the preHandler.
+ * Workspace scoping is structural. The list query scopes on the denormalized
+ * `reports.workspace_id` directly (Phase 11) so the workspace keyset index can
+ * serve the sort; the detail/stream lookups still reach workspace via the
+ * `reports → streams → categories` join. Either way a report/stream/category
+ * from another workspace can never appear or be addressable. The route's
+ * `reports:view` gate (allowed to all roles) plus this scoping mean any member
+ * reads, a non-member 404s at the preHandler.
  */
 
 const SEVERITIES: readonly Severity[] = ['info', 'warning', 'critical'];
@@ -259,7 +261,13 @@ function toSummary(row: SummaryRow): ReportSummary {
  * stream feed). Tags use ANY semantics (array overlap, `&&`).
  */
 function listConditions(workspaceId: string, streamId: string | undefined, p: ListParams): SQL[] {
-  const conditions: SQL[] = [eq(categories.workspaceId, workspaceId)];
+  // Scope directly on the denormalized `reports.workspace_id` (Phase 11), not
+  // `categories.workspace_id` reached through the streams→categories join. This
+  // lets the `(workspace_id, received_at DESC, id DESC)` composite index serve
+  // the keyset ORDER BY without a full sort; the joins below remain ONLY to
+  // project the stream/category/source summary names. The stream-feed path adds
+  // `reports.stream_id = :streamId`, which still selects `(stream_id, received_at)`.
+  const conditions: SQL[] = [eq(reports.workspaceId, workspaceId)];
   if (streamId) conditions.push(eq(reports.streamId, streamId));
   if (p.cursor) {
     conditions.push(

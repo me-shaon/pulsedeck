@@ -27,7 +27,17 @@ async function main(): Promise<void> {
   // there are zero users. Idempotent (no-op once any user exists).
   await runBootstrap(db, sql, auth, env);
 
-  const app = buildServer({ sql, logger: true, env, auth });
+  const app = buildServer({
+    sql,
+    logger: true,
+    env,
+    auth,
+    redisUrl: env.REDIS_URL,
+    sseEnabled: env.SSE_ENABLED,
+  });
+  // Connect the realtime Redis tier when REDIS_URL is set; a no-op otherwise.
+  // start() never throws — a Redis failure logs and degrades to single-instance.
+  await app.realtime.start();
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
 
   // Close the server and drain the connection pool on container stop so

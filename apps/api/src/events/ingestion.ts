@@ -68,6 +68,15 @@ class InProcessIngestionBus implements IngestionBus {
 }
 
 /**
+ * Construct a fresh, isolated in-process bus. The app uses the {@link ingestionBus}
+ * singleton; this factory exists so the realtime fan-out layer and its tests can
+ * stand up an independent bus without touching process-wide state.
+ */
+export function createIngestionBus(): IngestionBus {
+  return new InProcessIngestionBus();
+}
+
+/**
  * Process-wide singleton bus. Decorated onto the Fastify app in `buildServer`
  * (as `app.ingestionBus`) so routes consume it via the app and tests can import
  * it directly to assert emissions.

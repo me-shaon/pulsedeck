@@ -4,8 +4,10 @@ import { registerAuthHandler } from './auth/fastify.js';
 import { createDrizzle, type Db } from './db/index.js';
 import type { Sql } from './db.js';
 import { ingestionBus } from './events/ingestion.js';
+import { createRealtime, type Realtime } from './events/realtime.js';
 import { authRoutes } from './routes/auth.js';
 import { dashboardRoutes } from './routes/dashboards.js';
+import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { reportReadRoutes } from './routes/reports-read.js';
 import { reportRoutes } from './routes/reports.js';
@@ -34,6 +36,13 @@ export interface BuildServerOptions {
   db?: Db;
   /** Pre-built better-auth instance; defaults to `createAuth(db, env)`. */
   auth?: Auth;
+  /** Enables the multi-instance (Redis) SSE tier when set. Unset → in-process. */
+  redisUrl?: string;
+  /** SSE endpoint master switch (env `SSE_ENABLED`). Defaults to enabled. */
+  sseEnabled?: boolean;
+  /** Pre-built realtime layer; defaults to `createRealtime({ bus, redisUrl })`.
+   * Injectable so tests can supply a fake or a Redis-backed instance. */
+  realtime?: Realtime;
 }
 
 /**
@@ -47,6 +56,9 @@ export function buildServer({
   env = {},
   db,
   auth,
+  redisUrl,
+  sseEnabled = true,
+  realtime,
 }: BuildServerOptions): FastifyInstance {
   const app = Fastify({ logger });
 
@@ -60,6 +72,28 @@ export function buildServer({
   // In-process ingestion event bus; the SSE/webhook fan-out attaches here later
   // and Phase 10 can swap the singleton for a Redis-backed bus transparently.
   app.decorate('ingestionBus', ingestionBus);
+
+  // Realtime fan-out layer (PRD §7). Layers on top of the in-process bus and,
+  // when `redisUrl` is set, fans events across replicas via Redis pub/sub. The
+  // bus subscription is wired in the constructor, so single-instance SSE works
+  // immediately; `start()` (called in index.ts) only connects Redis. Closed via
+  // the onClose hook below so `app.close()` (tests + graceful shutdown) cleans up.
+  const realtimeInstance =
+    realtime ??
+    createRealtime({
+      bus: ingestionBus,
+      redisUrl,
+      logger: {
+        info: (m) => app.log.info(m),
+        warn: (m) => app.log.warn(m),
+        error: (m, err) => app.log.error({ err }, m),
+      },
+    });
+  app.decorate('realtime', realtimeInstance);
+  app.decorate('sseEnabled', sseEnabled);
+  app.addHook('onClose', async () => {
+    await realtimeInstance.close();
+  });
 
   // Default request decorations the auth preHandlers populate.
   app.decorateRequest('user', null);
@@ -85,6 +119,7 @@ export function buildServer({
   app.register(reportRoutes);
   app.register(reportReadRoutes);
   app.register(dashboardRoutes);
+  app.register(eventRoutes);
 
   return app;
 }

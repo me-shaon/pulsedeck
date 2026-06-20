@@ -14,6 +14,15 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
   REDIS_URL: z.string().url('REDIS_URL must be a valid connection URL').optional(),
+  // Realtime SSE master switch (PRD §7 "SSE on/off"). Default ON: the endpoint is
+  // available and clients live-update. Set to a falsy value (false/0/no/off) to
+  // force the Polling tier — the SSE endpoint then 503s and clients refetch on an
+  // interval instead. Redis (REDIS_URL) is an orthogonal concern: it only fans
+  // SSE out across replicas and is never required for SSE itself.
+  SSE_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v == null || !/^(false|0|no|off)$/i.test(v.trim())),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   BOOTSTRAP_EMAIL: z.string().optional(),

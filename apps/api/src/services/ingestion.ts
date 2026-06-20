@@ -318,6 +318,10 @@ export async function ingestReport(
       // Lost the idempotency race — the winner committed first (ON CONFLICT only
       // releases once the holder commits). Read its row via `tx`, not a separate
       // pooled connection, to avoid pool-exhaustion deadlocks inside the txn.
+      // NOTE: the `existing!` non-null assertion is sound ONLY under READ
+      // COMMITTED (the default): this reselect takes a fresh snapshot and sees
+      // the just-committed winner. Do not raise the pool/txn isolation to
+      // REPEATABLE READ/SERIALIZABLE without revisiting this branch.
       const [existing] = await tx
         .select()
         .from(reports)

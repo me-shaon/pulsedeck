@@ -2,7 +2,7 @@ import { MAX_PAYLOAD_BYTES } from '@pulsedeck/schema';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { makeRequireSource } from '../auth/source.js';
-import { hashToken } from '../auth/tokens.js';
+import { hashToken, looksLikeApiKey } from '../auth/tokens.js';
 import type { Report } from '../db/index.js';
 import { ingestReport, ingestSchemaVersion } from '../services/ingestion.js';
 
@@ -93,7 +93,14 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
     ...rateLimitConfig(),
     keyGenerator(request) {
       const header = request.headers.authorization;
-      if (header?.startsWith('Bearer ')) return hashToken(header.slice('Bearer '.length).trim());
+      if (header?.startsWith('Bearer ')) {
+        const raw = header.slice('Bearer '.length).trim();
+        // Only a well-formed key buckets per-source. Garbage/random tokens fall
+        // through to a per-IP bucket so an attacker can't mint a fresh bucket
+        // per request (which would both bypass the limit and evict real sources'
+        // counters from the bounded in-memory store) before the auth DB lookup.
+        if (looksLikeApiKey(raw)) return hashToken(raw);
+      }
       return request.ip;
     },
   });
@@ -177,6 +184,12 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
           return reply.code(403).send({ error: 'out_of_scope' });
         case 'unknown_slug':
           return reply.code(409).send({ error: 'unknown_slug', which: result.which });
+        default: {
+          // Exhaustiveness guard: a new IngestResult variant becomes a compile
+          // error here rather than a silently unanswered request.
+          const _exhaustive: never = result;
+          return reply.code(500).send({ error: 'Internal Server Error', _exhaustive });
+        }
       }
     },
   );

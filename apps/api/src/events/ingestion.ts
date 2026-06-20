@@ -48,7 +48,17 @@ class InProcessIngestionBus implements IngestionBus {
   private readonly emitter = new EventEmitter().setMaxListeners(0);
 
   emitReportIngested(event: ReportIngestedEvent): void {
-    this.emitter.emit(EVENT, event);
+    // Invoke listeners with per-subscriber isolation: the report is already
+    // committed when we emit, so a throwing subscriber (a buggy SSE/webhook
+    // handler) must NOT propagate up and turn a successful ingest into a 500.
+    // Errors are logged and swallowed; one bad subscriber can't break the rest.
+    for (const listener of this.emitter.listeners(EVENT)) {
+      try {
+        (listener as ReportIngestedHandler)(event);
+      } catch (err) {
+        console.error('[ingestion-bus] report.ingested subscriber threw', err);
+      }
+    }
   }
 
   onReportIngested(handler: ReportIngestedHandler): () => void {

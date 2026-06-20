@@ -3,7 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PulseDeck</title>
+    <meta name="color-scheme" content="light dark" />
+    <title>PulseDeck — Design System</title>
+    <script>
+      // Set the theme class before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var stored = localStorage.getItem('pulsedeck-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored ? stored === 'dark' : prefersDark;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {
+          /* no-op */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

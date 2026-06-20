@@ -1,0 +1,344 @@
+@import 'tailwindcss';
+
+/*
+ * PulseDeck design tokens.
+ * Identity: calm instrument panel meets editorial briefing.
+ * - Brand "Pulse" (iris-violet) is kept OUTSIDE the semantic palette so domain
+ *   status (severity / status / sentiment) is never visually ambiguous.
+ * - All component colors read from CSS variables; light + dark are first-class.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+/* ----------------------------------------------------------------------------
+ * RAW TOKENS — light theme (default)
+ * ------------------------------------------------------------------------- */
+:root {
+  /* Neutrals */
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #f4f4f6; /* subtle raised / secondary fill */
+  --surface-hover: #f1f1f4; /* hover / accent fill */
+  --border: #e7e7eb;
+  --border-strong: #d7d7dd;
+  --ink: #0c0e14;
+  --muted: #6b7280;
+
+  /* Brand "Pulse" — iris-violet. Used sparingly. */
+  --brand: #6e56cf;
+  --brand-strong: #5b45b0; /* active / pressed */
+  --brand-fg: #ffffff;
+  --brand-tint: color-mix(in srgb, var(--brand) 12%, var(--surface));
+  --primary: var(--brand); /* primary button fill */
+  --primary-hover: var(--brand-strong);
+
+  /* Semantic — severity (fixed to domain enums) */
+  --severity-info: #3b82f6;
+  --severity-warning: #f59e0b;
+  --severity-critical: #ef4444;
+
+  /* Semantic — status */
+  --status-healthy: #10b981;
+  --status-degraded: #f59e0b;
+  --status-down: #ef4444;
+  --status-unknown: #9ca3af;
+
+  /* Semantic — sentiment */
+  --sentiment-positive: #10b981;
+  --sentiment-negative: #ef4444;
+  --sentiment-neutral: #9ca3af;
+
+  /* Tinted badge pairs (bg + AA-safe foreground) keyed by hue, not by domain. */
+  --tint-blue-bg: #eaf2fe;
+  --tint-blue-fg: #1d4ed8;
+  --tint-amber-bg: #fdf3e3;
+  --tint-amber-fg: #b45309;
+  --tint-red-bg: #fdecec;
+  --tint-red-fg: #b91c1c;
+  --tint-green-bg: #e6f6ef;
+  --tint-green-fg: #047857;
+  --tint-gray-bg: #f1f2f4;
+  --tint-violet-bg: #eeebfa;
+  --tint-gray-fg: #4b5563;
+  --tint-violet-fg: #5b45b0;
+
+  /* Focus ring = brand */
+  --ring: var(--brand);
+
+  --radius: 6px;
+}
+
+/* ----------------------------------------------------------------------------
+ * RAW TOKENS — dark theme (first-class)
+ * ------------------------------------------------------------------------- */
+.dark {
+  --bg: #0b0d12;
+  --surface: #13161d;
+  --surface-2: #1a1e27;
+  --surface-hover: #1f242f;
+  --border: #222630;
+  --border-strong: #2d323e;
+  --ink: #e8eaf0;
+  --muted: #8a90a0;
+
+  --brand: #7c6bf0;
+  --brand-strong: #9486f5;
+  --brand-fg: #ffffff;
+  --brand-tint: color-mix(in srgb, var(--brand) 18%, var(--surface));
+
+  --severity-info: #60a5fa;
+  --severity-warning: #fbbf24;
+  --severity-critical: #f87171;
+
+  --status-healthy: #34d399;
+  --status-degraded: #fbbf24;
+  --status-down: #f87171;
+  --status-unknown: #9ca3af;
+
+  --sentiment-positive: #34d399;
+  --sentiment-negative: #f87171;
+  --sentiment-neutral: #9ca3af;
+
+  /* Dark badges: translucent hue tint + light readable text. */
+  --tint-blue-bg: color-mix(in srgb, #3b82f6 20%, transparent);
+  --tint-blue-fg: #93c5fd;
+  --tint-amber-bg: color-mix(in srgb, #f59e0b 20%, transparent);
+  --tint-amber-fg: #fcd34d;
+  --tint-red-bg: color-mix(in srgb, #ef4444 20%, transparent);
+  --tint-red-fg: #fca5a5;
+  --tint-green-bg: color-mix(in srgb, #10b981 20%, transparent);
+  --tint-green-fg: #6ee7b7;
+  --tint-gray-bg: color-mix(in srgb, #9ca3af 20%, transparent);
+  --tint-gray-fg: #d1d5db;
+  --tint-violet-bg: color-mix(in srgb, #7c6bf0 24%, transparent);
+  --tint-violet-fg: #c9bef9;
+
+  /* Primary button slightly deepened so white label text clears AA on dark. */
+  --primary: #6b57e0;
+  --primary-hover: #7c6bf0;
+}
+
+/* ----------------------------------------------------------------------------
+ * THEME MAPPING — expose tokens to Tailwind v4 utilities (@theme inline)
+ *   Generates: bg-*, text-*, border-*, ring-*, font-*, rounded-*, text-size
+ * ------------------------------------------------------------------------- */
+@theme inline {
+  /* ShadCN-style semantic aliases (so primitives work out of the box) */
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--brand-fg);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--surface-hover);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--severity-critical);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--border);
+  --color-ring: var(--ring);
+
+  /* Brand + brief-named neutral aliases */
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-foreground: var(--brand-fg);
+  --color-brand-tint: var(--brand-tint);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+
+  /* Domain semantics as color utilities (bg-status-healthy, text-severity-critical…) */
+  --color-severity-info: var(--severity-info);
+  --color-severity-warning: var(--severity-warning);
+  --color-severity-critical: var(--severity-critical);
+  --color-status-healthy: var(--status-healthy);
+  --color-status-degraded: var(--status-degraded);
+  --color-status-down: var(--status-down);
+  --color-status-unknown: var(--status-unknown);
+  --color-sentiment-positive: var(--sentiment-positive);
+  --color-sentiment-negative: var(--sentiment-negative);
+  --color-sentiment-neutral: var(--sentiment-neutral);
+
+  /* Type roles */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', 'Menlo', monospace;
+
+  /* Compact dashboard scale (12 / 13 / 14 base, larger display for metrics) */
+  --text-xs: 0.75rem; /* 12 */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem; /* 13 */
+  --text-sm--line-height: 1.15rem;
+  --text-base: 0.875rem; /* 14 */
+  --text-base--line-height: 1.35rem;
+  --text-lg: 1rem; /* 16 */
+  --text-lg--line-height: 1.4rem;
+  --text-xl: 1.125rem; /* 18 */
+  --text-xl--line-height: 1.5rem;
+  --text-2xl: 1.375rem; /* 22 */
+  --text-2xl--line-height: 1.6rem;
+  --text-display: 2.25rem; /* 36 — big metric values */
+  --text-display--line-height: 2.4rem;
+
+  /* Radius — consistent 6px */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  /* Component motion (kept subtle; the pulse line carries the boldness) */
+  --animate-overlay-in: overlay-in 160ms ease-out;
+  --animate-overlay-out: overlay-out 140ms ease-in;
+  --animate-content-in: content-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-content-out: content-out 130ms ease-in;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes content-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(2px) scale(0.985);
+  }
+}
+
+/* ----------------------------------------------------------------------------
+ * BASE
+ * ------------------------------------------------------------------------- */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numerals in data contexts read as a precise instrument: tabular by default
+     for tables, metrics and machine identifiers. */
+  :where(table, .tabular) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Brand focus ring everywhere keyboard focus lands. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  /* Components that paint their own ring opt out of the default outline. */
+  [data-ring='self']:focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--brand) 26%, transparent);
+  }
+}
+
+@layer utilities {
+  /* Machine-identifier text role (src_…, pd_…, ISO timestamps, metric keys). */
+  .font-mono,
+  .mono {
+    font-family: var(--font-mono);
+    font-feature-settings: 'tnum' 1;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+ * THE PULSE — the signature element's motion.
+ *   A short luminous dash ("comet") travels along the ECG trace.
+ *   Frozen automatically by the reduced-motion block below.
+ * ------------------------------------------------------------------------- */
+.pulse-comet {
+  stroke-dasharray: 110 calc(var(--pulse-len, 1000) - 110);
+  animation: pulse-scan var(--pulse-speed, 4s) linear infinite;
+}
+
+@keyframes pulse-scan {
+  from {
+    stroke-dashoffset: var(--pulse-len, 1000);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Live-source dot: a soft expanding halo. */
+@keyframes live-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.live-ping {
+  animation: live-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ----------------------------------------------------------------------------
+ * REDUCED MOTION — honor the user's preference globally.
+ * The signature pulse line listens to this too (renders static).
+ * ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -43,7 +43,7 @@ pulsedeck/
     web/        # Vite + React frontend
   packages/
     schema/     # shared Zod schemas + types (single source of truth)
-    demo/       # the demo agent (npx pulsedeck-demo)
+    demo/       # the demo agent (node packages/demo/dist/cli.js)
 ```
 
 ---
@@ -65,8 +65,10 @@ Open **http://localhost:3000**, complete the `/setup` wizard (create your admin 
 2. Run the demo agent — it registers and pushes realistic reports (exercising all 8 block types) every 30s:
 
 ```bash
-npx pulsedeck-demo --url http://localhost:3000 --token reg_xxxxx
-# one-shot instead of a loop:  npx pulsedeck-demo --url http://localhost:3000 --token reg_xxxxx --once
+# from the repo root (requires Node + pnpm install once)
+pnpm --filter @pulsedeck/demo dev --url http://localhost:3000 --token reg_xxxxx
+# one-shot instead of a loop:  add --once
+pnpm --filter @pulsedeck/demo dev --url http://localhost:3000 --token reg_xxxxx --once
 ```
 
 Watch the categories, streams, charts, and the realtime feed populate.

@@ -23,10 +23,18 @@ declare module 'fastify' {
 }
 
 /**
+/**
+ * Throttle window for the last-seen write. At ingest volume a per-push `UPDATE`
+ * of the same `sources` row causes MVCC bloat and row-lock contention, so we
+ * only write when the stored value is stale by at least this much.
+ */
+const LAST_SEEN_THROTTLE_MS = 60_000;
+
+/**
  * preHandler factory: authenticate the request as a source via its `pd_` API
  * key. Responds 401 (and halts) when the header is missing, malformed, or the
  * key is unknown/revoked. On success sets `request.source` and bumps
- * `last_seen_at` without blocking the request (fire-and-forget).
+ * `last_seen_at` (throttled, fire-and-forget — never blocks the push).
  */
 export function makeRequireSource(db: Db): preHandlerHookHandler {
   return async function requireSource(request: FastifyRequest, reply: FastifyReply) {
@@ -55,14 +63,18 @@ export function makeRequireSource(db: Db): preHandlerHookHandler {
 
     request.source = source;
 
-    // Fire-and-forget last-seen bump: ingestion must not block on, or fail
-    // because of, this bookkeeping write. Errors are swallowed deliberately.
-    void db
-      .update(sources)
-      .set({ lastSeenAt: new Date() })
-      .where(eq(sources.id, source.id))
-      .catch((err) => {
-        request.log.warn({ err, sourceId: source.id }, 'failed to bump source last_seen_at');
-      });
+    // Throttled, fire-and-forget last-seen bump: skip the write entirely unless
+    // the value is stale, so a high-frequency source doesn't hammer its row.
+    // Ingestion must not block on, or fail because of, this bookkeeping write.
+    const lastSeen = source.lastSeenAt?.getTime() ?? 0;
+    if (Date.now() - lastSeen >= LAST_SEEN_THROTTLE_MS) {
+      void db
+        .update(sources)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(sources.id, source.id))
+        .catch((err) => {
+          request.log.warn({ err, sourceId: source.id }, 'failed to bump source last_seen_at');
+        });
+    }
   };
 }

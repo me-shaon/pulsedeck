@@ -49,12 +49,6 @@ export function sourceHealth(
   return 'stale';
 }
 
-export interface ScopeGrants {
-  scope?: SourceScope;
-  categoryIds?: string[];
-  streamIds?: string[];
-}
-
 /**
  * Validate that every grant id named for a scope belongs to `workspaceId`.
  * Prevents an admin (or a malformed request) from granting a source write
@@ -66,7 +60,12 @@ async function validateGrantOwnership(
   scope: SourceScope,
   categoryIds: string[],
   streamIds: string[],
-): Promise<'category_not_in_workspace' | 'stream_not_in_workspace' | null> {
+): Promise<CreateSourceError | null> {
+  // A narrowed scope with no grants would leave the source unable to write
+  // anywhere — surface that as an error instead of a silently-broken source.
+  if (scope === 'category' && categoryIds.length === 0) return 'category_scope_requires_grants';
+  if (scope === 'stream' && streamIds.length === 0) return 'stream_scope_requires_grants';
+
   if (scope === 'category' && categoryIds.length > 0) {
     const rows = await tx
       .select({ id: categories.id })
@@ -148,7 +147,11 @@ export interface CreateSourceInput {
   streamIds?: string[];
 }
 
-export type CreateSourceError = 'category_not_in_workspace' | 'stream_not_in_workspace';
+export type CreateSourceError =
+  | 'category_not_in_workspace'
+  | 'stream_not_in_workspace'
+  | 'category_scope_requires_grants'
+  | 'stream_scope_requires_grants';
 
 export interface CreateSourceResult {
   source: Source;

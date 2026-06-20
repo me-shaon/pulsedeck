@@ -1,0 +1,10 @@
+{
+  // Typecheck both src AND test (the build uses tsconfig.json/tsup for src only).
+  // Keeps test type errors from rotting silently — esp. the credential-path suite.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "test"]
+}

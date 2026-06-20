@@ -50,10 +50,10 @@ describeIfDb('sources: registration & management (integration)', () => {
   let auth: Auth;
   let app: FastifyInstance;
 
-  const admin = { name: 'Ada', email: `admin-${id('user')}@example.com`, password: 'supersecret1' };
+  const admin = { name: 'Ada', email: `admin-${id('usr')}@example.com`, password: 'supersecret1' };
   const editor = {
     name: 'Edie',
-    email: `editor-${id('user')}@example.com`,
+    email: `editor-${id('usr')}@example.com`,
     password: 'supersecret2',
   };
   let workspaceId: string;
@@ -158,7 +158,7 @@ describeIfDb('sources: registration & management (integration)', () => {
 
   it('Non-member cannot create a source (404, existence hidden)', async () => {
     const stranger = await auth.api.signUpEmail({
-      body: { name: 'Guido', email: `guido-${id('user')}@example.com`, password: 'supersecret9' },
+      body: { name: 'Guido', email: `guido-${id('usr')}@example.com`, password: 'supersecret9' },
       returnHeaders: true,
     });
     const res = await app.inject({
@@ -240,7 +240,7 @@ describeIfDb('sources: registration & management (integration)', () => {
   it('expired registration token → 410', async () => {
     const raw = generateRegToken();
     await db.insert(sourceRegistrationTokens).values({
-      id: id('registrationToken'),
+      id: id('regtok'),
       sourceId,
       tokenHash: hashToken(raw),
       expiresAt: new Date(Date.now() - 1000),
@@ -322,14 +322,14 @@ describeIfDb('sources: registration & management (integration)', () => {
 
   it('revoke: the key 401s but the source + history remain', async () => {
     // Seed a report so we can confirm history survives revocation.
-    const catId = id('category');
-    const stmId = id('stream');
+    const catId = id('cat');
+    const stmId = id('stm');
     await db.insert(categories).values({ id: catId, workspaceId, name: 'Ops', slug: 'ops' });
     await db
       .insert(streams)
       .values({ id: stmId, categoryId: catId, name: 'Builds', slug: 'builds' });
     await db.insert(reports).values({
-      id: id('report'),
+      id: id('rpt'),
       streamId: stmId,
       sourceId,
       idempotencyKey: 'k1',

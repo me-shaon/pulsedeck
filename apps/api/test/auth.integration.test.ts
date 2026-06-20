@@ -47,10 +47,10 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   let app: FastifyInstance;
 
   // Shared state threaded across the ordered `it`s.
-  const admin = { name: 'Ada', email: `admin-${id('user')}@example.com`, password: 'supersecret1' };
+  const admin = { name: 'Ada', email: `admin-${id('usr')}@example.com`, password: 'supersecret1' };
   const member = {
     name: 'Linus',
-    email: `member-${id('user')}@example.com`,
+    email: `member-${id('usr')}@example.com`,
     password: 'supersecret2',
   };
   let workspaceId: string;
@@ -112,7 +112,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/setup',
-      payload: { name: 'Eve', email: `eve-${id('user')}@example.com`, password: 'supersecret3' },
+      payload: { name: 'Eve', email: `eve-${id('usr')}@example.com`, password: 'supersecret3' },
     });
     expect(res.statusCode).toBe(409);
   });
@@ -177,9 +177,9 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   });
 
   it('rejects an expired invite token (410)', async () => {
-    const token = `tok_${id('invite')}`;
+    const token = `tok_${id('inv')}`;
     await db.insert(invites).values({
-      id: id('invite'),
+      id: id('inv'),
       workspaceId,
       role: 'viewer',
       token,
@@ -209,7 +209,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   it('a non-member cannot see the workspace (404, existence hidden)', async () => {
     // Fresh user with no membership.
     const stranger = await auth.api.signUpEmail({
-      body: { name: 'Guido', email: `guido-${id('user')}@example.com`, password: 'supersecret5' },
+      body: { name: 'Guido', email: `guido-${id('usr')}@example.com`, password: 'supersecret5' },
       returnHeaders: true,
     });
     const res = await app.inject({

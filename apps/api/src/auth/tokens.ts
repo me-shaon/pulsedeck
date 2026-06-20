@@ -18,7 +18,7 @@ import { nanoid } from 'nanoid';
 export const REG_TOKEN_PREFIX = 'reg_';
 export const API_KEY_PREFIX = 'pd_';
 
-/** Entropy of the random tail. 36 url-safe nanoid chars ≈ 214 bits. */
+/** Entropy of the random tail. 36 url-safe nanoid chars ≈ 216 bits. */
 const SECRET_SIZE = 36;
 
 /** Mint a fresh one-time registration token (`reg_...`). Raw — hash before storing. */

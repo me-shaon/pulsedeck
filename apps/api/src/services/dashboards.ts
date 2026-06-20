@@ -27,6 +27,17 @@ import { categories, dashboards, id, streams, type Dashboard } from '../db/index
 /** A Drizzle transaction handle (the argument to `db.transaction`). */
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
+/**
+ * Serialize the invariant-bearing mutations (create / set-default / delete) per
+ * workspace with a transaction-scoped advisory lock, so "exactly one default"
+ * can't be broken by two concurrent flips under READ COMMITTED. The lock is
+ * released at txn end. (A partial unique index `(workspace_id) WHERE is_default`
+ * is the durable backstop — deferred to the ops phase as it needs a migration.)
+ */
+async function lockWorkspace(tx: Tx, workspaceId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${workspaceId}::text)::bigint)`);
+}
+
 /** Lowercase, hyphenated slug stem from a free-text name. */
 function slugStem(name: string): string {
   const stem = name
@@ -159,6 +170,7 @@ export async function createDashboard(
   input: CreateDashboardInput,
 ): Promise<DashboardFull> {
   const row = await db.transaction(async (tx) => {
+    await lockWorkspace(tx, workspaceId);
     const [agg] = await tx
       .select({
         count: sql<number>`count(*)::int`,
@@ -239,6 +251,7 @@ export async function setDefaultDashboard(
   dashId: string,
 ): Promise<MutationResult> {
   return db.transaction(async (tx) => {
+    await lockWorkspace(tx, workspaceId);
     const [target] = await tx
       .select({ id: dashboards.id })
       .from(dashboards)
@@ -268,6 +281,7 @@ export async function deleteDashboard(
   dashId: string,
 ): Promise<MutationResult> {
   return db.transaction(async (tx) => {
+    await lockWorkspace(tx, workspaceId);
     const [target] = await tx
       .select({ id: dashboards.id, isDefault: dashboards.isDefault })
       .from(dashboards)

@@ -1,5 +1,5 @@
 import type { Severity } from '@pulsedeck/schema';
-import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { WidgetRange } from '../dashboards/layout-schema.js';
 import type { Db } from '../db/index.js';
 import { categories, reportMetrics, reports, streams } from '../db/index.js';
@@ -142,11 +142,12 @@ export interface MetricSeries {
 }
 
 /**
- * Ordered `{ occurredAt, value }[]` for `(stream, key)` within `range`. The
- * `occurred_at >= cutoff` predicate with equality on `(stream_id, key)` is an
- * index range-scan over `(stream_id, key, occurred_at)`. Capped at
- * {@link MAX_SERIES_POINTS} (oldest→newest, so the cap drops the most recent tail
- * only on pathological volumes — documented).
+ * Ordered (oldest→newest) `{ occurredAt, value }[]` for `(stream, key)` within
+ * `range`, the shape a chart wants. The `occurred_at >= cutoff` predicate with
+ * equality on `(stream_id, key)` is an index range-scan over
+ * `(stream_id, key, occurred_at)`. On pathological volumes the cap keeps the
+ * MOST RECENT {@link MAX_SERIES_POINTS} (fetch newest-first, then reverse), so a
+ * chart shows the latest window rather than dropping it.
  */
 export async function getMetricSeries(
   db: Db,
@@ -164,11 +165,12 @@ export async function getMetricSeries(
         gte(reportMetrics.occurredAt, cutoff(range)),
       ),
     )
-    .orderBy(asc(reportMetrics.occurredAt), asc(reportMetrics.id))
+    .orderBy(desc(reportMetrics.occurredAt), desc(reportMetrics.id))
     .limit(MAX_SERIES_POINTS + 1)) as unknown as Array<{ value: number; occurredAt: Date }>;
 
   const truncated = rows.length > MAX_SERIES_POINTS;
-  const visible = truncated ? rows.slice(0, MAX_SERIES_POINTS) : rows;
+  // Keep the newest N, then reverse to oldest→newest for plotting.
+  const visible = (truncated ? rows.slice(0, MAX_SERIES_POINTS) : rows).reverse();
   return {
     streamId,
     metricKey: key,

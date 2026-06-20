@@ -73,10 +73,10 @@ export function PulseLine({
 
   return (
     <div
+      {...props}
       role="img"
       aria-label="Report cadence pulse"
       className={cn('inline-block leading-none text-brand', className)}
-      {...props}
     >
       <svg
         width={width}

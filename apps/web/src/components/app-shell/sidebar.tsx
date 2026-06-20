@@ -91,10 +91,13 @@ export function Sidebar({ active = 'overview', onNavigate }: SidebarProps) {
               key={s.name}
               type="button"
               data-ring="self"
+              title={`${s.name} — ${s.status}`}
               className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Hash className="size-3.5 shrink-0 opacity-60" />
               <span className="flex-1 text-left">{s.name}</span>
+              {/* Color carries the at-a-glance signal; status is ALSO conveyed as
+                  text (title tooltip + screen-reader label) so it isn't color-only. */}
               <span
                 aria-hidden
                 className={cn(
@@ -104,13 +107,16 @@ export function Sidebar({ active = 'overview', onNavigate }: SidebarProps) {
                   s.status === 'down' && 'bg-status-down',
                 )}
               />
+              <span className="sr-only">status: {s.status}</span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="border-t border-border px-4 py-3 text-[0.6875rem] text-muted-foreground">
-        <span className="mono">v0.1 · design system</span>
+        <span>
+          <span className="mono">v0.1</span> · design system
+        </span>
       </div>
     </nav>
   );

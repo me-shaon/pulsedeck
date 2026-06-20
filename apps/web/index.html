@@ -13,6 +13,8 @@
           var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
           var dark = stored ? stored === 'dark' : prefersDark;
           if (dark) document.documentElement.classList.add('dark');
+          // Resolve native UI (scrollbars/form controls) to the theme pre-mount.
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
         } catch (e) {
           /* no-op */
         }

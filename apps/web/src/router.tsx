@@ -9,6 +9,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ensureAuthConfig, ensureDashboards, ensureSession, ensureWorkspaces } from '@/lib/guards';
 import { validateReportSearch } from '@/lib/report-search';
 import { WorkspaceProvider } from '@/lib/workspace-context';
+import { useWorkspaceLiveUpdates } from '@/hooks/use-live-updates';
 import { AppShell } from '@/components/app-shell/app-shell';
 import { ErrorState } from '@/components/common/states';
 import { PulseLine } from '@/components/pulse-line';
@@ -127,6 +128,8 @@ const workspaceRoute = createRoute({
 
 function WorkspaceLayout() {
   const { workspace, role } = workspaceRoute.useRouteContext();
+  // One SSE subscription per open workspace; re-subscribes on workspace switch.
+  useWorkspaceLiveUpdates(workspace.id);
   return (
     <WorkspaceProvider workspace={workspace} role={role}>
       <AppShell>

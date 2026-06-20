@@ -1,21 +1,24 @@
-import { useState } from 'react';
+import { RouterProvider } from '@tanstack/react-router';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/lib/theme';
-import { AppShell } from '@/components/app-shell/app-shell';
 import { Toaster } from '@/components/ui/sonner';
-import { DesignPage } from '@/pages/design';
+import { queryClient } from '@/lib/query-client';
+import { createAppRouter } from '@/router';
 
 /**
- * For Phase 7 the app's default view is the design-system kitchen sink, shown
- * inside the real app shell. Product screens and routing arrive in Phase 8.
+ * App root: TanStack Query cache + theme + the type-safe TanStack Router.
+ * The router carries the query client in its context so route guards can warm
+ * data in `beforeLoad`. Toast surface lives under the theme provider.
  */
+const router = createAppRouter(queryClient);
+
 export function App() {
-  const [active, setActive] = useState('overview');
   return (
-    <ThemeProvider>
-      <AppShell active={active} onNavigate={setActive}>
-        <DesignPage />
-      </AppShell>
-      <Toaster />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

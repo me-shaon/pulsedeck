@@ -5,29 +5,22 @@ import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 
 /*
- * App shell: fixed left sidebar + top bar + main content frame.
- * Presentational only (no data wiring). Responsive: at < lg the sidebar
+ * App shell: fixed left sidebar + top bar + main content frame. The Sidebar and
+ * Topbar are self-wiring (router + workspace context + queries); the shell only
+ * owns layout and the mobile slide-over. Responsive: at < lg the sidebar
  * collapses behind a slide-over opened from the topbar menu button.
  */
-export interface AppShellProps {
-  children: React.ReactNode;
-  active?: string;
-  onNavigate?: (id: string) => void;
-}
-
-export function AppShell({ children, active, onNavigate }: AppShellProps) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="hidden shrink-0 lg:block">
-        <Sidebar active={active} onNavigate={onNavigate} />
+        <Sidebar />
       </aside>
 
-      {/* Mobile slide-over. Built on Radix Dialog so it inherits focus trapping,
-          Escape-to-close, body scroll lock, focus restoration, and aria-modal —
-          every screen inherits this shell on mobile, so a11y must live here. */}
+      {/* Mobile slide-over (Radix Dialog → focus trap, Esc, scroll lock, a11y). */}
       <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="animate-overlay-in fixed inset-0 z-50 bg-black/45 lg:hidden" />
@@ -36,13 +29,7 @@ export function AppShell({ children, active, onNavigate }: AppShellProps) {
             className="animate-content-in fixed left-0 top-0 z-50 h-full focus:outline-none lg:hidden"
           >
             <Dialog.Title className="sr-only">Navigation</Dialog.Title>
-            <Sidebar
-              active={active}
-              onNavigate={(id) => {
-                onNavigate?.(id);
-                setMobileOpen(false);
-              }}
-            />
+            <Sidebar onNavigate={() => setMobileOpen(false)} />
             <Dialog.Close
               aria-label="Close navigation"
               data-ring="self"

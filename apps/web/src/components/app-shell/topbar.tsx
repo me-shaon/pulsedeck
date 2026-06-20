@@ -1,4 +1,6 @@
-import { ChevronsUpDown, Menu, Plus } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { Check, ChevronsUpDown, LogOut, Menu, Plus } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { PulseLine } from '@/components/pulse-line';
 import { Button } from '@/components/ui/button';
@@ -10,15 +12,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { signOut } from '@/lib/auth-client';
+import { invalidateAuth } from '@/lib/guards';
+import { queryClient } from '@/lib/query-client';
+import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { useWorkspaces } from '@/hooks/use-workspace-data';
 
-export interface TopbarProps {
-  onMenuClick?: () => void;
-}
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
+  const navigate = useNavigate();
+  const { workspace } = useCurrentWorkspace();
+  const workspaces = useWorkspaces();
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+  async function handleSignOut() {
+    await signOut();
+    await invalidateAuth(queryClient);
+    toast('Signed out');
+    navigate({ to: '/login' });
+  }
+
+  const initial = workspace.name.charAt(0).toUpperCase();
+
   return (
     <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-3 sm:px-4">
-      {/* Mobile sidebar trigger */}
       <Button
         variant="ghost"
         size="icon"
@@ -29,30 +45,38 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         <Menu className="size-4" />
       </Button>
 
-      {/* Workspace switcher placeholder */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="gap-2 px-2">
             <span className="flex size-5 items-center justify-center rounded bg-brand text-[0.6875rem] font-semibold text-brand-foreground">
-              P
+              {initial}
             </span>
-            <span className="hidden font-medium sm:inline">Personal</span>
+            <span className="hidden max-w-40 truncate font-medium sm:inline">{workspace.name}</span>
             <ChevronsUpDown className="size-3.5 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-          <DropdownMenuItem>Personal</DropdownMenuItem>
-          <DropdownMenuItem>Acme Platform</DropdownMenuItem>
+          {workspaces.data?.map((w) => (
+            <DropdownMenuItem
+              key={w.id}
+              onSelect={() => navigate({ to: '/w/$ws', params: { ws: w.slug } })}
+            >
+              <span className="flex-1 truncate">{w.name}</span>
+              {w.id === workspace.id ? <Check className="size-4 text-brand" /> : null}
+            </DropdownMenuItem>
+          ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => navigate({ to: '/new-workspace' })}>
             <Plus className="size-4" /> New workspace
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleSignOut}>
+            <LogOut className="size-4" /> Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* The signature pulse line, living in the header. */}
-      <div className="ml-auto hidden items-center gap-2 md:flex">
+      <div className={cn('ml-auto hidden items-center gap-2 md:flex')}>
         <span className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground">
           Cadence
         </span>

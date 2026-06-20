@@ -294,6 +294,106 @@
 }
 
 /* ----------------------------------------------------------------------------
+ * MARKDOWN BLOCK PROSE
+ *   Scoped typography for agent-authored markdown (react-markdown, skipHtml).
+ *   No typography plugin — kept deliberately small and on-token.
+ * ------------------------------------------------------------------------- */
+@layer components {
+  .pd-markdown > :first-child {
+    margin-top: 0;
+  }
+  .pd-markdown > :last-child {
+    margin-bottom: 0;
+  }
+  .pd-markdown h1,
+  .pd-markdown h2,
+  .pd-markdown h3,
+  .pd-markdown h4 {
+    margin: 1.1em 0 0.4em;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .pd-markdown h1 {
+    font-size: 1.25rem;
+  }
+  .pd-markdown h2 {
+    font-size: 1.1rem;
+  }
+  .pd-markdown h3 {
+    font-size: 1rem;
+  }
+  .pd-markdown p,
+  .pd-markdown ul,
+  .pd-markdown ol,
+  .pd-markdown blockquote,
+  .pd-markdown pre,
+  .pd-markdown table {
+    margin: 0.5em 0;
+  }
+  .pd-markdown ul,
+  .pd-markdown ol {
+    padding-left: 1.4em;
+  }
+  .pd-markdown ul {
+    list-style: disc;
+  }
+  .pd-markdown ol {
+    list-style: decimal;
+  }
+  .pd-markdown li {
+    margin: 0.2em 0;
+  }
+  .pd-markdown a {
+    color: var(--brand);
+    text-underline-offset: 2px;
+  }
+  .pd-markdown strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .pd-markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--surface-2);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  .pd-markdown pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75em 0.9em;
+    overflow-x: auto;
+  }
+  .pd-markdown pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .pd-markdown blockquote {
+    border-left: 2px solid var(--border-strong);
+    padding-left: 0.9em;
+    color: var(--muted);
+  }
+  .pd-markdown hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1em 0;
+  }
+  .pd-markdown table {
+    border-collapse: collapse;
+    font-size: 0.95em;
+  }
+  .pd-markdown th,
+  .pd-markdown td {
+    border: 1px solid var(--border);
+    padding: 0.35em 0.6em;
+    text-align: left;
+  }
+}
+
+/* ----------------------------------------------------------------------------
  * THE PULSE — the signature element's motion.
  *   A short luminous dash ("comet") travels along the ECG trace.
  *   Frozen automatically by the reduced-motion block below.

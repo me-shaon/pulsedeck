@@ -24,6 +24,10 @@ services:
       dockerfile: apps/web/Dockerfile
     ports:
       - '${WEB_PORT:-3000}:80'
+    # nginx proxies /api → the api service (see apps/web/nginx.conf). Start the
+    # api first so the upstream name resolves; the proxy 502s until it's ready.
+    depends_on:
+      - api
 
   postgres:
     image: postgres:16

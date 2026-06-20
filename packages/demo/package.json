@@ -1,0 +1,26 @@
+{
+  "name": "@pulsedeck/demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PulseDeck demo agent — registers as a source and pushes realistic fake reports over the real HTTP protocol so a fresh dashboard fills in under two minutes.",
+  "bin": {
+    "pulsedeck-demo": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

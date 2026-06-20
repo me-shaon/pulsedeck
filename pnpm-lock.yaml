@@ -173,6 +173,18 @@ importers:
         specifier: ^6.0.5
         version: 6.4.3(@types/node@22.19.21)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)
 
+  packages/demo:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.21
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/schema:
     dependencies:
       zod:

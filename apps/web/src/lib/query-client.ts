@@ -57,4 +57,14 @@ export const queryKeys = {
   sources: (wsId: string) => ['sources', wsId] as const,
   report: (wsId: string, reportId: string) => ['report', wsId, reportId] as const,
   reports: (wsId: string, scope: unknown) => ['reports', wsId, scope] as const,
+  // Dashboards (Phase 9)
+  dashboards: (wsId: string) => ['dashboards', wsId] as const,
+  dashboard: (wsId: string, dashId: string) => ['dashboard', wsId, dashId] as const,
+  metricLatest: (wsId: string, streamId: string, key: string) =>
+    ['metric-latest', wsId, streamId, key] as const,
+  metricSeries: (wsId: string, streamId: string, key: string, range: unknown) =>
+    ['metric-series', wsId, streamId, key, range] as const,
+  reportCount: (wsId: string, opts: unknown) => ['report-count', wsId, opts] as const,
+  alertFeed: (wsId: string, categoryId: string, limit: unknown) =>
+    ['alert-feed', wsId, categoryId, limit] as const,
 };

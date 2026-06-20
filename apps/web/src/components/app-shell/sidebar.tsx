@@ -1,15 +1,29 @@
-import { Link } from '@tanstack/react-router';
-import { Hash, LayoutGrid, Radio, Search, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import {
+  Hash,
+  LayoutDashboard,
+  LayoutGrid,
+  Plus,
+  Radio,
+  Search,
+  Settings,
+  Star,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LiveDot } from '@/components/live-dot';
-import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { canBuildDashboards, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useTree } from '@/hooks/use-workspace-data';
+import { useDashboards, useDashboardMutations } from '@/hooks/use-dashboards';
+import { CreateDashboardDialog } from '@/components/dashboard/dashboard-dialogs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/sonner';
 
 /**
- * Wired sidebar: fixed system items (Overview, Search, Sources, Settings) +
- * the auto-generated category → stream tree from `GET /tree`. Each stream links
- * to its feed and shows its report count. Active state is router-derived.
+ * Wired sidebar: the workspace's dashboards as pages (Overview fallback + each
+ * custom dashboard, the default marked with a star), the fixed system items
+ * (All reports, Search, Sources, Settings), and the auto-generated category →
+ * stream tree from `GET /tree`. Active state is router-derived.
  */
 
 // TanStack Router's Link className is a string; active/inactive styling goes
@@ -22,17 +36,28 @@ const streamBase =
   'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 const NAV = [
-  { label: 'Overview', icon: LayoutGrid, to: '/w/$ws' as const, exact: true },
-  { label: 'All reports', icon: Hash, to: '/w/$ws/reports' as const, exact: false },
-  { label: 'Search', icon: Search, to: '/w/$ws/search' as const, exact: false },
-  { label: 'Sources', icon: Radio, to: '/w/$ws/sources' as const, exact: false },
-  { label: 'Settings', icon: Settings, to: '/w/$ws/settings' as const, exact: false },
+  { label: 'All reports', icon: Hash, to: '/w/$ws/reports' as const },
+  { label: 'Search', icon: Search, to: '/w/$ws/search' as const },
+  { label: 'Sources', icon: Radio, to: '/w/$ws/sources' as const },
+  { label: 'Settings', icon: Settings, to: '/w/$ws/settings' as const },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   const ws = workspace.slug;
+  const navigate = useNavigate();
   const tree = useTree(workspace.id);
+  const dashboards = useDashboards(workspace.id);
+  const { create } = useDashboardMutations(workspace.id);
+  const canBuild = canBuildDashboards(role);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  async function handleCreate(input: { name: string; icon: string | null }) {
+    const { dashboard } = await create.mutateAsync(input);
+    toast(`Created “${dashboard.name}”`);
+    onNavigate?.();
+    navigate({ to: '/w/$ws/d/$dashId', params: { ws, dashId: dashboard.id } });
+  }
 
   return (
     <nav
@@ -44,7 +69,87 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <span className="text-sm font-semibold tracking-tight">PulseDeck</span>
       </div>
 
+      {/* Dashboards (pages) */}
       <div className="flex flex-col gap-0.5 p-2">
+        <div className="flex items-center justify-between px-2.5 py-1">
+          <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+            Dashboards
+          </span>
+          {canBuild ? (
+            <button
+              type="button"
+              data-ring="self"
+              aria-label="New dashboard"
+              title="New dashboard"
+              onClick={() => setCreateOpen(true)}
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        <Link
+          to="/w/$ws/overview"
+          params={{ ws }}
+          onClick={onNavigate}
+          data-ring="self"
+          className={navBase}
+          activeProps={linkActive}
+          inactiveProps={linkInactive}
+        >
+          {({ isActive }) => (
+            <>
+              <Indicator active={isActive} />
+              <LayoutGrid className="size-4 shrink-0" />
+              Overview
+            </>
+          )}
+        </Link>
+
+        {dashboards.isPending ? (
+          <div className="flex flex-col gap-1.5 px-2.5 py-1">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-2/3" />
+          </div>
+        ) : (
+          dashboards.data?.dashboards.map((d) => (
+            <Link
+              key={d.id}
+              to="/w/$ws/d/$dashId"
+              params={{ ws, dashId: d.id }}
+              onClick={onNavigate}
+              data-ring="self"
+              className={navBase}
+              activeProps={linkActive}
+              inactiveProps={linkInactive}
+              title={d.name}
+            >
+              {({ isActive }) => (
+                <>
+                  <Indicator active={isActive} />
+                  {d.icon ? (
+                    <span className="flex size-4 shrink-0 items-center justify-center text-sm leading-none">
+                      {d.icon}
+                    </span>
+                  ) : (
+                    <LayoutDashboard className="size-4 shrink-0" />
+                  )}
+                  <span className="flex-1 truncate text-left">{d.name}</span>
+                  {d.isDefault ? (
+                    <Star
+                      className="size-3 shrink-0 text-muted-foreground"
+                      aria-label="Default dashboard"
+                    />
+                  ) : null}
+                </>
+              )}
+            </Link>
+          ))
+        )}
+      </div>
+
+      <div className="flex flex-col gap-0.5 border-t border-border px-2 py-2">
         {NAV.map((item) => {
           const Icon = item.icon;
           return (
@@ -52,7 +157,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               key={item.label}
               to={item.to}
               params={{ ws }}
-              activeOptions={{ exact: item.exact }}
               onClick={onNavigate}
               data-ring="self"
               className={navBase}
@@ -125,6 +229,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="border-t border-border px-4 py-3 text-[0.6875rem] text-muted-foreground">
         <span className="truncate">{workspace.name}</span>
       </div>
+
+      <CreateDashboardDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={handleCreate}
+      />
     </nav>
   );
 }

@@ -182,6 +182,141 @@ export interface Tree {
   categories: TreeCategory[];
 }
 
+// --- Dashboards & widgets (Phase 9) -------------------------------------
+
+/** Column span on the 12-column responsive grid (full / half / third). */
+export type WidgetSpan = 'full' | 'half' | 'third';
+/** Time window shared by chart / report_count widgets. */
+export type WidgetRange = '24h' | '7d' | '30d';
+/** Bucket granularity for the report_count widget. */
+export type CountBucket = 'day' | 'hour';
+/** Chart rendering variant (reuses the Phase 8 chart renderer's variants). */
+export type ChartVariant = 'line' | 'bar' | 'area';
+/** report_count target scope. */
+export type CountScope = 'stream' | 'category';
+/** The five widget types the grid builder supports. */
+export type WidgetType = 'stream_feed' | 'metric' | 'chart' | 'report_count' | 'alert_feed';
+
+export interface StreamFeedConfig {
+  streamId: string;
+  limit: number;
+}
+export interface MetricConfig {
+  streamId: string;
+  metricKey: string;
+  label?: string;
+}
+export interface ChartConfig {
+  streamId: string;
+  metricKey: string;
+  variant: ChartVariant;
+  range?: WidgetRange;
+}
+export interface ReportCountConfig {
+  scope: CountScope;
+  targetId: string;
+  bucket?: CountBucket;
+  range?: WidgetRange;
+}
+export interface AlertFeedConfig {
+  categoryId: string;
+  limit: number;
+}
+
+interface WidgetBase {
+  id: string;
+  span: WidgetSpan;
+  row: number;
+}
+
+/** A single dashboard widget — discriminated on `type` (mirrors the API layout schema). */
+export type DashboardWidget =
+  | (WidgetBase & { type: 'stream_feed'; config: StreamFeedConfig })
+  | (WidgetBase & { type: 'metric'; config: MetricConfig })
+  | (WidgetBase & { type: 'chart'; config: ChartConfig })
+  | (WidgetBase & { type: 'report_count'; config: ReportCountConfig })
+  | (WidgetBase & { type: 'alert_feed'; config: AlertFeedConfig });
+
+/** The versioned layout envelope persisted in `dashboards.layout`. */
+export interface DashboardLayout {
+  version: 1;
+  widgets: DashboardWidget[];
+}
+
+/** Lightweight sidebar/listing shape (no layout). */
+export interface DashboardListItem {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  position: number;
+  isDefault: boolean;
+}
+
+/** `GET /dashboards` — list + default marker + Overview-fallback flag. */
+export interface DashboardListResult {
+  dashboards: DashboardListItem[];
+  defaultDashboardId: string | null;
+  isOverviewFallback: boolean;
+}
+
+/** Full dashboard incl. the normalized layout. */
+export interface DashboardFull extends DashboardListItem {
+  workspaceId: string;
+  layout: DashboardLayout;
+  createdAt: string;
+}
+
+/** One metric sample. */
+export interface MetricPoint {
+  value: number;
+  occurredAt: string;
+}
+
+/** metric widget — latest value (+ previous + delta). */
+export interface MetricLatest {
+  streamId: string;
+  metricKey: string;
+  latest: MetricPoint | null;
+  previous: MetricPoint | null;
+  delta: number | null;
+}
+
+/** chart widget — a metric time-series. */
+export interface MetricSeries {
+  streamId: string;
+  metricKey: string;
+  range: WidgetRange;
+  points: MetricPoint[];
+  truncated: boolean;
+}
+
+/** report_count widget — one time bucket of report volume. */
+export interface CountBucketRow {
+  bucket: string;
+  count: number;
+}
+
+export interface ReportCountResult {
+  scope: CountScope;
+  targetId: string;
+  bucket: CountBucket;
+  range: WidgetRange;
+  buckets: CountBucketRow[];
+}
+
+/** alert_feed widget — a compact report summary. */
+export interface AlertItem {
+  id: string;
+  title: string;
+  summary: string | null;
+  severity: Severity | null;
+  occurredAt: string;
+  receivedAt: string;
+  tags: string[];
+  stream: StreamRef;
+}
+
 /** Filters that drive the report list query (also serialized into the URL). */
 export interface ReportFilters {
   q?: string;

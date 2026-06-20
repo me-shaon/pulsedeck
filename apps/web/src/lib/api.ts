@@ -1,10 +1,19 @@
 import type {
+  AlertItem,
   AuthConfig,
+  CountBucket,
+  CountScope,
   CreatedInvite,
   CreatedSource,
+  DashboardFull,
+  DashboardLayout,
+  DashboardListResult,
   Invite,
   Member,
+  MetricLatest,
+  MetricSeries,
   ReissuedToken,
+  ReportCountResult,
   ReportDetailResponse,
   ReportFilters,
   ReportPage,
@@ -13,6 +22,7 @@ import type {
   Source,
   SourceScope,
   Tree,
+  WidgetRange,
   Workspace,
   WorkspaceListItem,
 } from './api-types';
@@ -90,8 +100,18 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!res.ok) {
-    const payload = (data ?? {}) as { error?: string; message?: string };
-    const message = payload.message ?? payload.error ?? `Request failed (${res.status}).`;
+    const payload = (data ?? {}) as {
+      error?: string;
+      message?: string;
+      issues?: Array<{ message?: string }>;
+    };
+    let message = payload.message ?? payload.error ?? `Request failed (${res.status}).`;
+    // Surface Zod-style validation feedback (422) so callers can show it inline
+    // instead of the opaque `validation_failed` code.
+    if (!payload.message && Array.isArray(payload.issues)) {
+      const detail = payload.issues.map((i) => i?.message).filter((m): m is string => Boolean(m));
+      if (detail.length > 0) message = detail.join('; ');
+    }
     const code = typeof payload.error === 'string' ? payload.error : undefined;
     throw new ApiError(res.status, message, code);
   }
@@ -221,3 +241,84 @@ export const getReport = (wsId: string, reportId: string, signal?: AbortSignal) 
 
 export const getTree = (wsId: string, signal?: AbortSignal) =>
   request<Tree>(`/workspaces/${wsId}/tree`, { signal });
+
+// --- Dashboards ----------------------------------------------------------
+
+export const listDashboards = (wsId: string, signal?: AbortSignal) =>
+  request<DashboardListResult>(`/workspaces/${wsId}/dashboards`, { signal });
+
+export const getDashboard = (wsId: string, dashId: string, signal?: AbortSignal) =>
+  request<{ dashboard: DashboardFull }>(`/workspaces/${wsId}/dashboards/${dashId}`, { signal });
+
+export const createDashboard = (
+  wsId: string,
+  input: { name: string; icon?: string | null; layout?: DashboardLayout },
+) =>
+  request<{ dashboard: DashboardFull }>(`/workspaces/${wsId}/dashboards`, {
+    method: 'POST',
+    body: input,
+  });
+
+export const updateDashboard = (
+  wsId: string,
+  dashId: string,
+  input: { name?: string; icon?: string | null; layout?: DashboardLayout; position?: number },
+) =>
+  request<{ dashboard: DashboardFull }>(`/workspaces/${wsId}/dashboards/${dashId}`, {
+    method: 'PATCH',
+    body: input,
+  });
+
+export const setDefaultDashboard = (wsId: string, dashId: string) =>
+  request<{ dashboard: DashboardFull }>(`/workspaces/${wsId}/dashboards/${dashId}/default`, {
+    method: 'POST',
+  });
+
+export const deleteDashboard = (wsId: string, dashId: string) =>
+  request<void>(`/workspaces/${wsId}/dashboards/${dashId}`, { method: 'DELETE' });
+
+// --- Widget data ---------------------------------------------------------
+
+export const getMetricLatest = (
+  wsId: string,
+  streamId: string,
+  metricKey: string,
+  signal?: AbortSignal,
+) =>
+  request<MetricLatest>(
+    `/workspaces/${wsId}/streams/${streamId}/metrics/${encodeURIComponent(metricKey)}/latest`,
+    { signal },
+  );
+
+export const getMetricSeries = (
+  wsId: string,
+  streamId: string,
+  metricKey: string,
+  range?: WidgetRange,
+  signal?: AbortSignal,
+) =>
+  request<MetricSeries>(
+    `/workspaces/${wsId}/streams/${streamId}/metrics/${encodeURIComponent(metricKey)}/series`,
+    { query: { range }, signal },
+  );
+
+export const getReportCount = (
+  wsId: string,
+  opts: { scope: CountScope; targetId: string; bucket?: CountBucket; range?: WidgetRange },
+  signal?: AbortSignal,
+) =>
+  request<ReportCountResult>(`/workspaces/${wsId}/reports/count`, {
+    query: { scope: opts.scope, targetId: opts.targetId, bucket: opts.bucket, range: opts.range },
+    signal,
+  });
+
+export const getAlertFeed = (
+  wsId: string,
+  categoryId: string,
+  limit?: number,
+  signal?: AbortSignal,
+) =>
+  request<{ alerts: AlertItem[] }>(`/workspaces/${wsId}/categories/${categoryId}/alerts`, {
+    query: { limit },
+    signal,
+  });

@@ -33,3 +33,12 @@ export function useCurrentWorkspace(): WorkspaceContextValue {
 export function canManage(role: Role | undefined): boolean {
   return role === 'owner' || role === 'admin';
 }
+
+/**
+ * Whether the current role may build dashboards (`dashboards:build` →
+ * Owner/Admin/Editor; Viewer is read-only). The API enforces this too — this
+ * just hides the edit affordances so a Viewer never sees a control that 403s.
+ */
+export function canBuildDashboards(role: Role | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'editor';
+}

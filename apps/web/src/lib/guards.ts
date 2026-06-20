@@ -1,8 +1,14 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { getAuthConfig, getWorkspace, listWorkspaces } from './api';
+import { getAuthConfig, getWorkspace, listDashboards, listWorkspaces } from './api';
 import { fetchSessionUser } from './auth-client';
 import { queryKeys } from './query-client';
-import type { AuthConfig, SessionUser, Workspace, WorkspaceListItem } from './api-types';
+import type {
+  AuthConfig,
+  DashboardListResult,
+  SessionUser,
+  Workspace,
+  WorkspaceListItem,
+} from './api-types';
 
 /**
  * Router `beforeLoad` data helpers. They read through TanStack Query so the
@@ -44,6 +50,18 @@ export function ensureWorkspace(
     queryKey: queryKeys.workspace(id),
     queryFn: ({ signal }) => getWorkspace(id, signal),
     staleTime: 30_000,
+  });
+}
+
+/**
+ * The workspace's dashboards, warm for the landing resolution: `/w/$ws` resolves
+ * to the default dashboard when one exists, else falls back to the Overview.
+ */
+export function ensureDashboards(qc: QueryClient, wsId: string): Promise<DashboardListResult> {
+  return qc.ensureQueryData({
+    queryKey: queryKeys.dashboards(wsId),
+    queryFn: ({ signal }) => listDashboards(wsId, signal),
+    staleTime: 15_000,
   });
 }
 

@@ -6,7 +6,7 @@ import {
   redirect,
 } from '@tanstack/react-router';
 import type { QueryClient } from '@tanstack/react-query';
-import { ensureAuthConfig, ensureSession, ensureWorkspaces } from '@/lib/guards';
+import { ensureAuthConfig, ensureDashboards, ensureSession, ensureWorkspaces } from '@/lib/guards';
 import { validateReportSearch } from '@/lib/report-search';
 import { WorkspaceProvider } from '@/lib/workspace-context';
 import { AppShell } from '@/components/app-shell/app-shell';
@@ -17,6 +17,7 @@ import { SetupPage } from '@/pages/setup';
 import { InvitePage } from '@/pages/invite';
 import { NewWorkspacePage } from '@/pages/new-workspace';
 import { OverviewPage } from '@/pages/overview';
+import { DashboardPage } from '@/pages/dashboard';
 import { ReportsPage } from '@/pages/reports';
 import { StreamPage } from '@/pages/stream';
 import { ReportDetailPage } from '@/pages/report-detail';
@@ -135,10 +136,38 @@ function WorkspaceLayout() {
   );
 }
 
+/**
+ * Workspace landing (`/w/$ws`): resolve to the default dashboard when one
+ * exists, else render the system Overview (recent reports + connected agents) so
+ * the landing page is never blank (PRD: auto Overview fallback).
+ */
 const overviewRoute = createRoute({
   getParentRoute: () => workspaceRoute,
   path: '/',
+  beforeLoad: async ({ context }) => {
+    const { workspace, queryClient } = context;
+    const res = await ensureDashboards(queryClient, workspace.id);
+    if (res.defaultDashboardId) {
+      throw redirect({
+        to: '/w/$ws/d/$dashId',
+        params: { ws: workspace.slug, dashId: res.defaultDashboardId },
+      });
+    }
+  },
   component: OverviewPage,
+});
+
+/** Always-reachable system Overview (the sidebar's "Overview" link target). */
+const explicitOverviewRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
+  path: 'overview',
+  component: OverviewPage,
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
+  path: 'd/$dashId',
+  component: DashboardPage,
 });
 
 const reportsRoute = createRoute({
@@ -188,6 +217,8 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   workspaceRoute.addChildren([
     overviewRoute,
+    explicitOverviewRoute,
+    dashboardRoute,
     reportsRoute,
     searchRoute,
     streamRoute,

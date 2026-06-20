@@ -27,6 +27,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   async function handleSignOut() {
     await signOut();
     await invalidateAuth(queryClient);
+    // Drop ALL cached data so the next user on this browser can't read the
+    // previous user's workspace data from the in-memory cache.
+    queryClient.clear();
     toast('Signed out');
     navigate({ to: '/login' });
   }

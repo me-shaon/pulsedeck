@@ -18,7 +18,10 @@ export function StatusIndicator({
 }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <span aria-hidden className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[status])} />
+      <span
+        aria-hidden
+        className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[status] ?? 'bg-status-unknown')}
+      />
       {showLabel ? (
         <span className="text-sm">{titleCase(status)}</span>
       ) : (

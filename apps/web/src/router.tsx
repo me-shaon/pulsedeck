@@ -38,9 +38,12 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
-    redirect: typeof s.redirect === 'string' ? s.redirect : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } => {
+    // Only accept a same-origin relative path (single leading slash). Rejects
+    // `//host`, `https://…`, and other absolute targets → no open redirect.
+    const r = typeof s.redirect === 'string' ? s.redirect : undefined;
+    return { redirect: r && /^\/(?!\/)/.test(r) ? r : undefined };
+  },
   beforeLoad: async ({ context, search }) => {
     const config = await ensureAuthConfig(context.queryClient);
     if (config.setupRequired) throw redirect({ to: '/setup' });

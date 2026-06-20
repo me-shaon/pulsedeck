@@ -1,5 +1,24 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { ApiError } from './api';
+
+/**
+ * Global session-expiry handler: if any query fails with 401 (the session cookie
+ * expired while a view was mounted — the router guards only catch this at
+ * navigation time), bounce to /login preserving the current location. A hard
+ * redirect also clears in-memory cache. Suppressed on the auth pages themselves
+ * to avoid a loop.
+ */
+const queryCache = new QueryCache({
+  onError: (error) => {
+    if (error instanceof ApiError && error.status === 401) {
+      const path = window.location.pathname;
+      if (!path.startsWith('/login') && !path.startsWith('/setup')) {
+        const dest = encodeURIComponent(path + window.location.search);
+        window.location.assign(`/login?redirect=${dest}`);
+      }
+    }
+  },
+});
 
 /**
  * Freshness without realtime: TanStack Query refetches on an interval and on
@@ -10,6 +29,7 @@ import { ApiError } from './api';
 export const POLL_INTERVAL_MS = 30_000;
 
 export const queryClient = new QueryClient({
+  queryCache,
   defaultOptions: {
     queries: {
       staleTime: 15_000,

@@ -151,7 +151,12 @@ export const artifactBlockSchema = z.object({
   ...envelope,
   type: z.literal('artifact'),
   label: z.string().min(1),
-  url: z.string().url(),
+  // http(s) only: `z.string().url()` alone still accepts javascript:/data: URLs,
+  // which must never reach a rendered href (the artifact is agent-supplied).
+  url: z
+    .string()
+    .url()
+    .refine((u) => /^https?:\/\//i.test(u), { message: 'url must be an http(s) URL' }),
   mime_type: z.string().optional(),
   size_bytes: z.number().int().nonnegative().optional(),
 });

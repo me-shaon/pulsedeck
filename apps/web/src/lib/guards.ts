@@ -67,7 +67,14 @@ export function ensureDashboards(qc: QueryClient, wsId: string): Promise<Dashboa
 
 /** Invalidate everything that depends on who is signed in. */
 export async function invalidateAuth(qc: QueryClient): Promise<void> {
-  await qc.invalidateQueries({ queryKey: queryKeys.session });
-  await qc.invalidateQueries({ queryKey: queryKeys.authConfig });
-  await qc.invalidateQueries({ queryKey: queryKeys.workspaces });
+  // `refetchType: 'all'` is required, not cosmetic: these queries have no active
+  // observers on the /setup and /login pages, so a plain invalidate would only
+  // mark them stale without refetching. The very next thing the caller does is
+  // `navigate('/')`, whose route guards read auth state via `ensureQueryData`,
+  // which serves stale-cached data without revalidating — so a setup/sign-in
+  // would read the OLD `setupRequired: true` / `session: null` and bounce right
+  // back. Forcing the refetch here makes the cache truthful before navigation.
+  await qc.invalidateQueries({ queryKey: queryKeys.session, refetchType: 'all' });
+  await qc.invalidateQueries({ queryKey: queryKeys.authConfig, refetchType: 'all' });
+  await qc.invalidateQueries({ queryKey: queryKeys.workspaces, refetchType: 'all' });
 }

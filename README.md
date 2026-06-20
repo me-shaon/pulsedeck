@@ -1,197 +1,197 @@
 # PulseDeck
 
-**The agent intelligence inbox — where structured reports from AI agents land, organized and readable for humans.**
+**The agent intelligence inbox** — a self-hostable, open-source dashboard where AI agents, automations, and scripts push structured reports that land organized, searchable, and readable for humans.
 
-Your agents do the analysis. PulseDeck is the briefing room: a self-hostable dashboard where AI agents push structured, schema-validated reports — SEO audits, deployment summaries, revenue snapshots, incident post-mortems — and humans read the result. Not a BI tool, not an observability platform, not another Slack channel. A proper home for agent output.
+AI agents generate valuable intelligence, but their outputs are trapped in noisy Slack channels, scattered emails, terminal logs, and markdown dumps. PulseDeck is the destination layer that was missing: instead of flooding your channels with raw output, agents send **schema-validated structured reports** to PulseDeck, where humans consume distilled insights over time.
 
-![PulseDeck demo](docs/demo.gif)
-
-> _Demo GIF placeholder — add `docs/demo.gif` (a ~15s capture of the demo agent filling the dashboard). Until then this image link will 404._
+> The agent does the analysis. PulseDeck displays the curated result — a briefing room, not a raw database.
 
 ---
 
-## Why PulseDeck
+## Features
 
-Agents generate intelligence and then dump it into chat channels, log files, and email where it scrolls away and dies. PulseDeck gives that output a structured, durable, human-readable home.
-
-- **Agent-first** — built for API ingestion and push-based publishing, not humans typing into forms.
-- **Protocol-owned** — PulseDeck defines one strict report schema (8 typed block primitives). Agents conform; validation is crisp and deterministic, and agents get structured `issues[]` feedback when they send invalid data.
-- **Human-friendly** — non-technical stakeholders read dashboards without engineering knowledge.
-- **Schema-driven** — no arbitrary JSON chaos. Metrics, charts, tables, timelines, alerts, status grids, markdown, and artifacts.
-- **Self-hostable by default** — one `docker compose up`. Nothing required beyond PostgreSQL. Realtime (Redis/SSE) is optional and degrades gracefully to polling.
-- **Organized** — workspaces → categories → streams → reports, with per-source write scopes, idempotent ingestion, and optional retention.
-
----
-
-## Quick start (one command)
-
-Requires Docker.
-
-```bash
-# 1. Clone and boot the whole stack (API + web + Postgres).
-git clone https://github.com/your-org/pulsedeck.git
-cd pulsedeck
-docker compose up
-```
-
-Then:
-
-1. Open **http://localhost:3000**.
-2. Complete the **`/setup`** wizard — create the admin user and your first workspace.
-3. Go to **Sources → Add source**, give it a name, and copy the one-time **registration token** (`reg_…`).
-4. Run the demo agent and watch the dashboard fill in under two minutes:
-
-```bash
-npx pulsedeck-demo --url http://localhost:3000 --token reg_xxxxxxxx
-```
-
-The demo agent registers as a real source and pushes a fresh, realistic report every ~30 seconds over the exact same HTTP protocol any agent uses. Once you're convinced, swap it for a real agent.
-
-> `http://localhost:3000` is the web origin; nginx proxies `/api` to the API. You can also point the demo straight at the API on `http://localhost:3001`.
-
----
-
-## The demo agent
-
-A zero-dependency Node CLI ([`packages/demo`](packages/demo)) that dogfoods the public protocol — it speaks plain HTTP exactly like a third-party agent, with no internal imports.
-
-```bash
-pulsedeck-demo --url <BASE_URL> --token <reg_xxx> [--interval <ms>] [--once]
-```
-
-| Flag         | Description                                                                      |
-| ------------ | -------------------------------------------------------------------------------- |
-| `--url`      | Base URL of PulseDeck (e.g. `http://localhost:3000` or `http://localhost:3001`). |
-| `--token`    | One-time registration token from **Add source**.                                 |
-| `--interval` | Delay between pushes in ms (default `30000`). Ignored with `--once`.             |
-| `--once`     | Register and push exactly one report, then exit.                                 |
-
-It cycles through six realistic templates — an **SEO Audit**, a **Deployment Summary**, a **Daily Revenue Snapshot**, an **Infra & Cost** report, an **Incident Post-Mortem**, and a **Market Digest** — collectively exercising all 8 block types with varied severity, tags, recent timestamps, and trending/randomized values so charts and series look alive.
-
-Run it from the repo without publishing to npm:
-
-```bash
-pnpm --filter @pulsedeck/demo build
-node packages/demo/dist/cli.js --url http://localhost:3001 --token reg_xxx --once
-# or, without building:
-pnpm --filter @pulsedeck/demo dev -- --url http://localhost:3001 --token reg_xxx --once
-```
-
----
-
-## Agent integration protocol (in brief)
-
-The dashboard's **Add source** screen gives you a copy-paste **setup prompt** with your token and the live schema embedded — hand it to any capable agent and it can integrate itself. The wire contract:
-
-**1. Register (one time):**
-
-```http
-POST {BASE_URL}/api/v1/sources/register
-X-Registration-Token: reg_xxx
-Content-Type: application/json
-
-{ "name": "My Agent", "agent_version": "1.0.0" }
-```
-
-→ `{ "source_id": "src_…", "api_key": "pd_…", "schema": { … } }`. The token is single-use; store the `api_key`.
-
-**2. Publish a report:**
-
-```http
-POST {BASE_URL}/api/v1/reports
-Authorization: Bearer pd_…
-Idempotency-Key: <uuid you generate per report>
-Content-Type: application/json
-
-{
-  "version": "1.0",
-  "source":   { "id": "src_…" },
-  "category": { "slug": "engineering" },
-  "stream":   { "slug": "deployments" },
-  "report":   { "title": "Deploy v2.3.1", "occurred_at": "2026-06-20T09:00:00Z", "severity": "info" },
-  "blocks":   [ /* metric · markdown · chart · table · timeline · alert · status · artifact */ ]
-}
-```
-
-Status contract: **201** created · **200** idempotent replay · **422** validation failure (with `issues[]`) · **401** bad key · **403** out of scope · **409** unknown slug (autocreate off) · **429** rate limited. Categories and streams are auto-created by slug when the source permits it (the default).
-
-**3. Discover the schema:** `GET {BASE_URL}/api/v1/schema` → `{ version, schema }`.
-
-The 8 block types and their exact fields are documented in [`BLOCK_SCHEMA.md`](BLOCK_SCHEMA.md) and implemented once in [`packages/schema`](packages/schema).
-
----
-
-## Realtime
-
-Live updates degrade gracefully — PulseDeck never blocks on infrastructure:
-
-- **SSE (default)** — the dashboard subscribes to `GET /api/v1/workspaces/:id/events` and updates live. Works single-instance with no extra services.
-- **Redis fan-out (optional)** — set `REDIS_URL` and enable the `realtime` compose profile to fan SSE across multiple API replicas.
-- **Polling (fallback)** — set `SSE_ENABLED=false` (or on disconnect) and clients refetch on an interval.
-
----
-
-## Self-hosting & configuration
-
-Copy `.env.example` to `.env` and adjust. Key variables:
-
-| Variable                                    | Required | Default   | Description                                                                                      |
-| ------------------------------------------- | -------- | --------- | ------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                              | ✓        | —         | PostgreSQL connection string.                                                                    |
-| `AUTH_SECRET`                               | ✓        | —         | Session-signing secret; **≥ 32 chars**, random.                                                  |
-| `PORT`                                      | —        | `3001`    | API listen port.                                                                                 |
-| `RETENTION_DAYS`                            | —        | `0`       | Purge reports older than N days; `0` keeps forever. Advisory-locked, single-run across replicas. |
-| `RETENTION_SWEEP_INTERVAL_MS`               | —        | `3600000` | How often the retention sweep runs.                                                              |
-| `REDIS_URL`                                 | —        | —         | Enables cross-replica realtime fan-out. Never required.                                          |
-| `SSE_ENABLED`                               | —        | `true`    | Master switch for the realtime SSE endpoint.                                                     |
-| `BETTER_AUTH_URL`                           | —        | —         | Public origin for OAuth callbacks / cross-origin clients.                                        |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | —        | —         | Set both to enable GitHub login; leave empty to hide it.                                         |
-| `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD`    | —        | —         | Seed an admin on first boot to skip `/setup` headlessly (idempotent).                            |
-
-Migrations run automatically on API startup. The web container's nginx proxies `/api` to the `api` service, so the SPA, auth, and SSE stream are all same-origin in production.
+- **Agent-native ingestion** — a simple, schema-driven HTTP protocol. Any agent that speaks it can publish: register once with an invite token, then `POST` reports. Synchronous validation returns structured `issues[]` so agents can self-correct.
+- **8 strict block types** — `metric`, `markdown`, `chart`, `table`, `timeline`, `alert`, `status`, `artifact`. One stable wire contract, predictable rendering, no JSON chaos.
+- **Structured report viewer** — flat, sequential rendering of every block: metric cards with trend + sentiment, sanitized markdown (raw HTML disabled), line/bar/area charts, real-type-sortable tables, timelines, alert banners, status grids, and drill-down artifact links.
+- **Categories → streams → reports** — navigation tree auto-generated from the data; reports are immutable and append-only.
+- **Dashboards** — a 12-column grid builder with 5 widget types (stream feed, metric, chart, report count, alert feed). Multiple dashboards per workspace; one default landing; an auto "Overview" fallback so the page is never blank.
+- **Full-text search + filters** — PostgreSQL `tsvector` search over title/summary/tags, plus filters by category, stream, source, severity, tags, and date range. No external search service.
+- **Workspaces + RBAC** — multiple workspaces, four roles (Owner / Admin / Editor / Viewer), invite links, first-run setup wizard.
+- **Source management** — register agents via one-time invite tokens, rotate/revoke API keys, set write scope, and see connected-agent health (active / stale / never).
+- **Realtime (optional, degrades gracefully)** — Server-Sent Events push updates live; falls back to polling with no config. Redis is needed only for multi-replica fan-out.
+- **Self-hostable in one command** — `docker compose up`. No required services beyond PostgreSQL.
+- **Retention** — optional time-based purge (`RETENTION_DAYS`), single-run across replicas via a Postgres advisory lock.
 
 ---
 
 ## Tech stack
 
-- **Backend** — Node 22, Fastify 5, Drizzle ORM, PostgreSQL 16, better-auth, Zod.
-- **Frontend** — React + Vite + Tailwind, served by nginx in production.
-- **Shared** — `@pulsedeck/schema` (the Zod wire contract used by API, web, and the setup prompt).
-- **Infra** — Docker Compose; optional Redis for realtime fan-out.
+| Layer          | Choice                                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| **Backend**    | Node.js (LTS), Fastify, TypeScript                                                                   |
+| **Database**   | PostgreSQL 16, Drizzle ORM (with `tsvector` full-text search)                                        |
+| **Validation** | Zod — a single shared `packages/schema` is the source of truth (backend validates, frontend renders) |
+| **Auth**       | better-auth (email/password + optional GitHub OAuth)                                                 |
+| **Realtime**   | Server-Sent Events; Redis pub/sub only for multi-replica fan-out                                     |
+| **Frontend**   | Vite, React, TanStack Router + Query, Tailwind + ShadCN, Recharts, react-markdown                    |
+| **Infra**      | Docker Compose, pnpm workspaces monorepo                                                             |
+
+```
+pulsedeck/
+  apps/
+    api/        # Fastify backend
+    web/        # Vite + React frontend
+  packages/
+    schema/     # shared Zod schemas + types (single source of truth)
+    demo/       # the demo agent (npx pulsedeck-demo)
+```
 
 ---
 
-## Development
+## Quick start (Docker — one command)
 
-PulseDeck is a pnpm monorepo (Node ≥ 22, pnpm 9).
+Requires Docker + Docker Compose.
 
 ```bash
-pnpm install            # install the workspace
-
-pnpm dev                # run API (3001) + web (3000) together
-pnpm build              # build every package/app
-pnpm typecheck          # type-check the workspace
-pnpm lint               # eslint
-pnpm test               # run tests
-pnpm format             # prettier --write
+git clone <repo-url> pulsedeck && cd pulsedeck
+docker compose up
 ```
 
-Workspace layout:
+Open **http://localhost:3000**, complete the `/setup` wizard (create your admin + workspace), and you're running. Migrations apply automatically on startup.
 
-```
-apps/
-  api/          Fastify ingestion + read API, auth, migrations
-  web/          React dashboard (Vite + Tailwind, nginx in prod)
-packages/
-  schema/       The canonical Zod report/block schema (the wire contract)
-  sdk/          Client SDK (stub; ships in v1.1)
-  demo/         The pulsedeck-demo agent (this phase)
+### See it fill with live data in under 2 minutes
+
+1. In the dashboard, go to **Sources → Add source**, name it, and copy the one-time registration token (`reg_…`).
+2. Run the demo agent — it registers and pushes realistic reports (exercising all 8 block types) every 30s:
+
+```bash
+npx pulsedeck-demo --url http://localhost:3000 --token reg_xxxxx
+# one-shot instead of a loop:  npx pulsedeck-demo --url http://localhost:3000 --token reg_xxxxx --once
 ```
 
-Database migrations (from `apps/api`): `pnpm --filter @pulsedeck/api db:generate` to author and `db:migrate` to apply; they also run automatically on API boot.
+Watch the categories, streams, charts, and the realtime feed populate.
+
+### Changing host ports (port already in use)
+
+The containers publish host ports that are **overridable** — handy when a port is already taken (e.g. you already run Postgres on `5432`, which causes
+`Bind for 0.0.0.0:5432 failed: port is already allocated`).
+
+Set the port(s) inline:
+
+```bash
+POSTGRES_PORT=5544 docker compose up
+# multiple:
+WEB_PORT=8080 API_PORT=8081 POSTGRES_PORT=5544 docker compose up
+```
+
+…or persist them in a root `.env` file (Compose reads it automatically):
+
+```bash
+cp .env.example .env      # then edit WEB_PORT / API_PORT / POSTGRES_PORT
+docker compose up
+```
+
+| Variable        | Default | Container           |
+| --------------- | ------- | ------------------- |
+| `WEB_PORT`      | `3000`  | web (the dashboard) |
+| `API_PORT`      | `3001`  | api                 |
+| `POSTGRES_PORT` | `5432`  | postgres            |
+
+These change only the **host** publish ports; the containers always reach each other over the internal network, so changing them never breaks anything. (Postgres is published mainly so you can connect from your host — the app does not depend on it.)
+
+> **Before any real use:** set a strong `AUTH_SECRET` (≥32 chars), e.g. put `AUTH_SECRET=$(openssl rand -base64 48)` in `.env`.
+
+---
+
+## Local development (without Docker)
+
+Requires Node 22 (LTS) + pnpm 9 + a PostgreSQL 16 instance.
+
+```bash
+pnpm install
+
+# 1. Point the API at your Postgres and set a secret (>=32 chars):
+cp .env.example .env
+#    edit DATABASE_URL and AUTH_SECRET in .env
+
+# 2. Apply migrations:
+pnpm --filter @pulsedeck/api db:migrate
+
+# 3. Run API (:3001) + web (:3000) together:
+pnpm dev
+```
+
+The web dev server proxies `/api` → `http://localhost:3001`, so it's same-origin (cookies stay first-party). Open **http://localhost:3000**.
+
+### Useful scripts
+
+```bash
+pnpm typecheck                          # all packages
+pnpm lint                               # eslint
+pnpm build                              # build every package
+pnpm --filter @pulsedeck/api test       # API + integration tests (needs DATABASE_URL)
+pnpm --filter @pulsedeck/schema test    # schema contract tests
+
+pnpm --filter @pulsedeck/api db:generate   # generate a migration from schema changes
+pnpm --filter @pulsedeck/api db:migrate    # apply migrations
+pnpm --filter @pulsedeck/api db:studio     # Drizzle Studio
+```
+
+---
+
+## Configuration
+
+All config is via environment variables (see [`.env.example`](./.env.example)).
+
+| Variable                                    | Required | Default   | Purpose                                                  |
+| ------------------------------------------- | -------- | --------- | -------------------------------------------------------- |
+| `DATABASE_URL`                              | ✓        | —         | PostgreSQL connection string                             |
+| `AUTH_SECRET`                               | ✓        | —         | Session/token signing secret (**≥32 chars**)             |
+| `PORT`                                      | —        | `3001`    | API listen port                                          |
+| `RETENTION_DAYS`                            | —        | `0`       | Purge reports older than N days (`0` = keep forever)     |
+| `RETENTION_SWEEP_INTERVAL_MS`               | —        | `3600000` | Retention sweep interval (when enabled)                  |
+| `REDIS_URL`                                 | —        | —         | Enables multi-replica SSE fan-out (optional)             |
+| `BETTER_AUTH_URL`                           | —        | —         | Public origin for OAuth callbacks (set for GitHub login) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | —        | —         | Enable the GitHub login button (both required)           |
+| `BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD`    | —        | —         | Headless first-run admin seed (skips `/setup`)           |
+
+### Realtime tiers (auto-detected at boot)
+
+| Tier                    | Config                   | Behavior                                           |
+| ----------------------- | ------------------------ | -------------------------------------------------- |
+| **Polling**             | `SSE_ENABLED=false`      | Client refetches on interval. Fully functional.    |
+| **Single-instance SSE** | default (no `REDIS_URL`) | In-process fan-out to connected clients. No Redis. |
+| **Multi-instance SSE**  | `REDIS_URL` set          | Redis pub/sub fans out across replicas.            |
+
+Enable Redis with the compose profile when you need it: `docker compose --profile realtime up`.
+
+---
+
+## Agent integration (in brief)
+
+Agents speak plain HTTP — no SDK required. The dashboard's **Add source** page renders a ready-to-paste setup prompt; the essentials:
+
+```text
+# 1. Register (one time) — token from the dashboard, expires in 24h
+POST {BASE_URL}/api/v1/sources/register
+  Header: X-Registration-Token: reg_xxxxx
+  Body:   { "name": "My Agent", "agent_version": "1.0.0" }
+  -> { "source_id": "src_...", "api_key": "pd_...", "schema": { ... } }
+
+# 2. Publish a report
+POST {BASE_URL}/api/v1/reports
+  Header: Authorization: Bearer pd_...
+  Header: Idempotency-Key: <uuid>       # reuse on retry to dedupe
+  Body:   { "version":"1.0", "source":{"id":"src_..."},
+            "category":{"slug":"engineering"}, "stream":{"slug":"deploys"},
+            "report":{ "title":"...", "occurred_at":"<ISO 8601>" },
+            "blocks":[ ... ] }           # see GET /api/v1/schema
+```
+
+Responses follow a strict status-code contract (`201` / `200` dup / `422` validation with `issues[]` / `401` / `403` / `409` / `429`). The [`packages/demo`](./packages/demo) agent is a complete, dependency-free reference implementation.
 
 ---
 
 ## License
 
-PulseDeck is licensed under the **GNU Affero General Public License v3.0** ([`LICENSE`](LICENSE)). You can self-host freely; anyone offering PulseDeck as a network service must release their modifications under the same license. Commercial relicensing is available separately. Contributions require signing a CLA — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+PulseDeck is licensed under the **GNU AGPL v3** — see [`LICENSE`](./LICENSE). Contributions require agreement to the [CLA](./CONTRIBUTING.md). Commercial use as a hosted service requires open-sourcing modifications, or a commercial license.

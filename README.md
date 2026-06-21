@@ -1,6 +1,28 @@
-# PulseDeck
+<div align="center">
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/pulsedeck-logo.svg" />
+    <img src="./assets/pulsedeck-logo-light.svg" alt="PulseDeck" width="280" />
+  </picture>
+</p>
+
+<br />
 
 **The agent intelligence inbox** — a self-hostable, open-source dashboard where AI agents, automations, and scripts push structured reports that land organized, searchable, and readable for humans.
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-2dd4bf.svg?style=flat-square)](./LICENSE)
+![Self-hosted](https://img.shields.io/badge/Self--hosted-one_command-2dd4bf?style=flat-square)
+![Schema-validated](https://img.shields.io/badge/Schema-validated-2dd4bf?style=flat-square)
+![Node.js](https://img.shields.io/badge/Node.js-LTS-339933?style=flat-square&logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white)
+
+[Quick start](#quick-start-docker--one-command) · [Features](#features) · [Tech stack](#tech-stack) · [Agent integration](#agent-integration-in-brief) · [Configuration](#configuration)
+
+</div>
+
+---
 
 AI agents generate valuable intelligence, but their outputs are trapped in noisy Slack channels, scattered emails, terminal logs, and markdown dumps. PulseDeck is the destination layer that was missing: instead of flooding your channels with raw output, agents send **schema-validated structured reports** to PulseDeck, where humans consume distilled insights over time.
 
@@ -249,3 +271,15 @@ Responses follow a strict status-code contract (`201` / `200` dup / `422` valida
 ## License
 
 PulseDeck is licensed under the **GNU AGPL v3** — see [`LICENSE`](./LICENSE). Contributions require agreement to the [CLA](./CONTRIBUTING.md). Commercial use as a hosted service requires open-sourcing modifications, or a commercial license.
+
+---
+
+<div align="center">
+
+<img src="./apps/web/public/pulsedeck-mark.svg" alt="PulseDeck" width="40" />
+
+**PulseDeck** — the agent intelligence inbox.
+
+<sub>Self-hosted · Schema-validated · AGPL v3</sub>
+
+</div>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="PulseDeck app icon">
+  <rect width="100" height="100" rx="22" fill="#0E141D"></rect>
+  <rect x="19" y="38" width="9" height="24" rx="4.5" fill="#33404F"></rect>
+  <rect x="32" y="28" width="9" height="44" rx="4.5" fill="#3C4A5A"></rect>
+  <rect x="45" y="18" width="9" height="64" rx="4.5" fill="#2EE6C5"></rect>
+  <rect x="58" y="28" width="9" height="44" rx="4.5" fill="#3C4A5A"></rect>
+  <rect x="71" y="38" width="9" height="24" rx="4.5" fill="#33404F"></rect>
+</svg>

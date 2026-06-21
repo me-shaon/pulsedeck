@@ -105,6 +105,27 @@ These change only the **host** publish ports; the containers always reach each o
 
 ---
 
+## Local development (Docker — hot reload)
+
+Everything in Docker, no host toolchain beyond Docker itself. Source is
+bind-mounted and both the API (tsx watch) and web (Vite HMR) reload on save.
+Requires Docker Compose v2.24+.
+
+```bash
+make dev
+# equivalently:
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Open **http://localhost:3000**. Edit anything under `apps/` or `packages/` and
+the change reloads live. `make dev-down` stops it; `make help` lists all targets.
+
+> File watching uses polling (`CHOKIDAR_USEPOLLING`) so edits are seen across the
+> macOS/Windows bind mount — reloads are a touch slower than a native run. For the
+> fastest inner loop, use the no-Docker flow below instead.
+
+---
+
 ## Local development (without Docker)
 
 Requires Node 22 (LTS) + pnpm 9 + a PostgreSQL 16 instance.

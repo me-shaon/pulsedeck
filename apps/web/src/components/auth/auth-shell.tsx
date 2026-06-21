@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { PulseLine } from '@/components/pulse-line';
-import { LiveDot } from '@/components/live-dot';
+import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 /** Centered, branded frame for the unauthenticated screens (login / setup). */
@@ -18,10 +18,7 @@ export function AuthShell({
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2">
-          <LiveDot color="brand" size={9} />
-          <span className="text-sm font-semibold tracking-tight">PulseDeck</span>
-        </div>
+        <Logo />
         <ThemeToggle />
       </div>
 

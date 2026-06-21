@@ -11,7 +11,7 @@ import {
   Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LiveDot } from '@/components/live-dot';
+import { Logo } from '@/components/brand/logo';
 import { canBuildDashboards, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useTree } from '@/hooks/use-workspace-data';
 import { useDashboards, useDashboardMutations } from '@/hooks/use-dashboards';
@@ -65,8 +65,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       className="flex h-full w-60 flex-col border-r border-border bg-surface"
     >
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <LiveDot color="brand" size={9} />
-        <span className="text-sm font-semibold tracking-tight">PulseDeck</span>
+        <Logo />
       </div>
 
       {/* Dashboards (pages) */}

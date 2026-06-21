@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------------------
+# DEVELOPMENT overlay — hot reload, everything in Docker. Merge ON TOP of the
+# production compose:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   (or simply `make dev`)
+#
+# It replaces the production `web` (nginx serving a built bundle) and `api`
+# (bundled, no dev deps) services with live processes that bind-mount your
+# working tree and reload on save. postgres/redis are inherited unchanged.
+#
+# Requires Docker Compose v2.24+ for the `!override` tag (replaces, not appends,
+# the inherited `ports`/`command`).
+# ---------------------------------------------------------------------------
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: pulsedeck/dev:latest # shared dev image, built once
+    command: pnpm --filter @pulsedeck/api dev # tsx watch → reload on save
+    restart: 'no'
+    environment:
+      # Bind-mounted file events don't propagate natively on macOS/Windows;
+      # polling makes tsx/chokidar see your edits.
+      CHOKIDAR_USEPOLLING: 'true'
+    volumes:
+      - .:/app
+      # Anonymous volumes shield the image's Linux-built deps from the host tree.
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/schema/node_modules
+      - /app/packages/sdk/node_modules
+      - /app/packages/demo/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: pulsedeck/dev:latest
+    command: pnpm --filter @pulsedeck/web dev --host # Vite dev server (HMR)
+    restart: 'no'
+    # Vite listens on 3000 directly (no nginx in dev). Override, don't append,
+    # the inherited 3000:80 mapping.
+    ports: !override
+      - '${WEB_PORT:-3000}:3000'
+    environment:
+      CHOKIDAR_USEPOLLING: 'true'
+      # Vite proxies /api → the api service over the compose network.
+      VITE_API_PROXY: http://api:3001
+    # Vite serves on 3000 in dev — replace the inherited nginx:80 probe.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      - api
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/api/node_modules
+      - /app/packages/schema/node_modules
+      - /app/packages/sdk/node_modules
+      - /app/packages/demo/node_modules

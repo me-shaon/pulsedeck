@@ -1,8 +1,15 @@
+# Production stack. `docker compose up -d` builds and runs the full app; the API
+# applies migrations on startup, so a fresh deploy comes up ready.
+#
+# For hot-reloading development, overlay docker-compose.dev.yml (see Makefile /
+# README): docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 services:
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    image: pulsedeck/api:latest
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
       # Change this to a long random value (>=32 chars) before any real use.
@@ -23,20 +30,38 @@ services:
       postgres:
         condition: service_healthy # wait for DB readiness, not just container start
       # redis intentionally NOT required to boot
+    healthcheck:
+      # /healthz = liveness + DB reachability. busybox wget ships in node:alpine.
+      # Use 127.0.0.1, not localhost: busybox resolves localhost to ::1 first and
+      # the server binds IPv4 only, so localhost would wrongly fail.
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3001/healthz || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s # grace for install-free boot + startup migrations
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    image: pulsedeck/web:latest
+    restart: unless-stopped
     ports:
       - '${WEB_PORT:-3000}:80'
     # nginx proxies /api → the api service (see apps/web/nginx.conf). Start the
     # api first so the upstream name resolves; the proxy 502s until it's ready.
     depends_on:
       - api
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:80/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: pulsedeck
       POSTGRES_PASSWORD: pulsedeck
@@ -53,6 +78,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     profiles: ['realtime']
 
 volumes:

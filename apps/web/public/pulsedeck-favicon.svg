@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32" role="img" aria-label="PulseDeck">
+  <rect x="19" y="38" width="9" height="24" rx="4.5" fill="#5B6675"></rect>
+  <rect x="32" y="28" width="9" height="44" rx="4.5" fill="#7C8898"></rect>
+  <rect x="45" y="18" width="9" height="64" rx="4.5" fill="#2EE6C5"></rect>
+  <rect x="58" y="28" width="9" height="44" rx="4.5" fill="#7C8898"></rect>
+  <rect x="71" y="38" width="9" height="24" rx="4.5" fill="#5B6675"></rect>
+</svg>

@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# Shared DEVELOPMENT image. Used by both the `web` (Vite) and `api` (tsx watch)
+# services in docker-compose.dev.yml — one image, two commands.
+#
+# At runtime the working tree is bind-mounted over /app for live reload, while
+# node_modules stay in the image (shielded by anonymous volumes in the dev
+# compose) so the macOS/Windows host tree never clobbers the Linux-built deps.
+#
+# This image is NOT for production — the prod images are apps/{api,web}/Dockerfile.
+# ---------------------------------------------------------------------------
+FROM node:22-alpine
+RUN corepack enable
+WORKDIR /app
+
+# Copy only manifests first so `pnpm install` caches across source edits.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json ./
+COPY apps/api/package.json   apps/api/
+COPY apps/web/package.json   apps/web/
+COPY apps/e2e/package.json   apps/e2e/
+COPY packages/schema/package.json packages/schema/
+COPY packages/sdk/package.json    packages/sdk/
+COPY packages/demo/package.json   packages/demo/
+
+# Full workspace install (dev deps included — tsx, vite, drizzle-kit, …).
+RUN pnpm install --frozen-lockfile
+
+# Source arrives via bind mount at runtime. The command is set per service in
+# docker-compose.dev.yml (vite for web, tsx watch for api).
+EXPOSE 3000 3001

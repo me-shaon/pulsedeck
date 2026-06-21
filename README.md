@@ -29,10 +29,12 @@ AI agents generate valuable intelligence, but their outputs are trapped in noisy
 > The agent does the analysis. PulseDeck displays the curated result — a briefing room, not a raw database.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/dashboard-dark.png" />
-    <img src="./assets/dashboard.png" alt="PulseDeck" />
-  </picture>
+  <a href="./assets/dashboard.png" target="_blank" rel="noopener noreferrer">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./assets/dashboard-dark.png" />
+      <img src="./assets/dashboard.png" alt="PulseDeck — click to view full size" />
+    </picture>
+  </a>
 </p>
 
 ---

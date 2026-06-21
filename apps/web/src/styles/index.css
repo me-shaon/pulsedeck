@@ -257,6 +257,10 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* Base UI scale. Design is intentionally compact (12/13/14 type, rem
+       spacing); 110% reads comfortably at 100% browser zoom without retuning
+       every token. Text + spacing are rem-based, so both scale from here. */
+    font-size: 110%;
   }
 
   /* Tailwind v4 Preflight resets the UA pointer cursor on controls. Restore it
@@ -281,7 +285,7 @@
     background-color: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 0.875rem; /* 14px at base scale; tracks html font-size */
     line-height: 1.45;
     /* Inter: cv05 = lower-case l with tail (disambiguates l / I / 1 in data UI). */
     font-feature-settings: 'cv05' 1;

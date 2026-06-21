@@ -30,7 +30,7 @@ describeIfDb('headless bootstrap (integration)', () => {
     sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
-    await sql`TRUNCATE users, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
+    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
     auth = createAuth(db, AUTH_ENV);
   });
 

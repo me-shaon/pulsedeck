@@ -1,4 +1,5 @@
 import { pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
+import { billingAccounts } from './accounts.js';
 import { serverTimestamp } from './columns.js';
 import { memberRole } from './enums.js';
 import { users } from './users.js';
@@ -15,6 +16,15 @@ import { users } from './users.js';
  */
 export const workspaces = pgTable('workspaces', {
   id: text('id').primaryKey(),
+  /**
+   * Owning account (the billing/tenancy entity). Self-host has one implicit
+   * account; cloud groups an agency's client workspaces under one account.
+   * Query workspaces by `account_id` — never assume a single account outside
+   * the provisioning path.
+   */
+  accountId: text('account_id')
+    .notNull()
+    .references(() => billingAccounts.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   defaultDashboardId: text('default_dashboard_id'),

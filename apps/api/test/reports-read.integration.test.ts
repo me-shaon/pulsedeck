@@ -18,6 +18,7 @@ import {
 import type { Sql } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { buildServer } from '../src/server.js';
+import { seedAccount } from './helpers.js';
 
 /**
  * Phase 6 read APIs end-to-end against a real Postgres (gated on DATABASE_URL;
@@ -129,7 +130,7 @@ describeIfDb('reports read APIs (integration)', () => {
     sqlClient = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sqlClient);
     await runMigrations(sqlClient);
-    await sqlClient`TRUNCATE users, workspaces, workspace_members, invites, sources,
+    await sqlClient`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, report_metrics, account, session, verification
       RESTART IDENTITY CASCADE`;
@@ -242,9 +243,12 @@ describeIfDb('reports read APIs (integration)', () => {
       });
     }
 
-    // A second workspace with its own report + stream — cross-workspace isolation.
+    // A second workspace (own account) with its own report + stream — cross-workspace isolation.
     const ws2 = id('ws');
-    await db.insert(workspaces).values({ id: ws2, name: 'Other', slug: `other-${id('ws')}` });
+    const account2 = await seedAccount(db, 'Other Account');
+    await db
+      .insert(workspaces)
+      .values({ id: ws2, accountId: account2, name: 'Other', slug: `other-${id('ws')}` });
     const cOther = id('cat');
     await db.insert(categories).values({ id: cOther, workspaceId: ws2, name: 'X', slug: 'x' });
     foreignStreamId = id('stm');

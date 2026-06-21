@@ -12,6 +12,24 @@ const EnvSchema = z.object({
 
   // Optional — sensible defaults.
   PORT: z.coerce.number().int().positive().default(3001),
+
+  // Deployment profile. `self-host` (default) runs the OSS substrate with
+  // permissive defaults: first-run setup wizard, no billing, one implicit
+  // account, unlimited everything. `cloud` flips the defaults for the granular
+  // flags below (public signup, billing on, multi-account, per-account
+  // retention). Each granular flag stays individually overridable.
+  DEPLOYMENT_MODE: z.enum(['self-host', 'cloud']).default('self-host'),
+  // How new accounts/users may be created. Default derived from DEPLOYMENT_MODE
+  // in runtime config: `setup` for self-host (first-run wizard only), `open` for
+  // cloud (public self-serve signup). `invite` allows only invited joins.
+  SIGNUP_MODE: z.enum(['setup', 'open', 'invite']).optional(),
+  // Whether billing UI/routes are active. Default derived from DEPLOYMENT_MODE
+  // (off self-host, on cloud). Accepts false/0/no/off (falsy) or any truthy string.
+  BILLING_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => (v == null ? undefined : !/^(false|0|no|off)$/i.test(v.trim()))),
+
   RETENTION_DAYS: z.coerce.number().int().min(0).default(0),
   // How often the in-process retention sweep runs (ms). Only meaningful when
   // RETENTION_DAYS > 0. Default 1h. Min 1s so a misconfig can't busy-loop.

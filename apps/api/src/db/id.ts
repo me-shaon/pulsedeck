@@ -11,6 +11,7 @@ import { nanoid } from 'nanoid';
 
 /** Entity → id prefix. Keep prefixes short, lowercase, and collision-free. */
 export const ID_PREFIXES = {
+  account: 'acc',
   workspace: 'ws',
   user: 'usr',
   source: 'src',

@@ -27,6 +27,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({
       githubEnabled: isGithubEnabled(app.authEnv),
       setupRequired: await isSetupRequired(app.db),
+      // Deployment capabilities the web renders off (no `if (cloud)` forks).
+      signupMode: app.runtime.signupMode,
+      billingEnabled: app.runtime.billingEnabled,
     });
   });
 

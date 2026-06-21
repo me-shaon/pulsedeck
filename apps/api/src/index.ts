@@ -1,5 +1,6 @@
 import { createAuth } from './auth/auth.js';
 import { runBootstrap } from './auth/setup.js';
+import { buildRuntimeConfig } from './config/runtime.js';
 import { createDb } from './db.js';
 import { createDrizzle } from './db/index.js';
 import { loadEnv, type Env } from './env.js';
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
     auth,
     redisUrl: env.REDIS_URL,
     sseEnabled: env.SSE_ENABLED,
+    runtime: buildRuntimeConfig(env),
     retentionDays: env.RETENTION_DAYS,
     retentionSweepIntervalMs: env.RETENTION_SWEEP_INTERVAL_MS,
   });

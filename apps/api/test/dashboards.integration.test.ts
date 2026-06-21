@@ -19,6 +19,7 @@ import {
 import type { Sql } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { buildServer } from '../src/server.js';
+import { seedAccount } from './helpers.js';
 
 /**
  * Phase 9 dashboards + widget-data APIs end-to-end against a real Postgres
@@ -142,7 +143,7 @@ describeIfDb('dashboards + widget-data APIs (integration)', () => {
     sqlClient = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sqlClient);
     await runMigrations(sqlClient);
-    await sqlClient`TRUNCATE users, workspaces, workspace_members, invites, sources,
+    await sqlClient`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, report_metrics, dashboards, account, session, verification
       RESTART IDENTITY CASCADE`;
@@ -260,9 +261,12 @@ describeIfDb('dashboards + widget-data APIs (integration)', () => {
       receivedAt: at(1 * HOUR),
     });
 
-    // --- foreign workspace -----------------------------------------------------
+    // --- foreign workspace (own account) ---------------------------------------
     ws2 = id('ws');
-    await db.insert(workspaces).values({ id: ws2, name: 'Other', slug: `other-${id('ws')}` });
+    const account2 = await seedAccount(db, 'Other Account');
+    await db
+      .insert(workspaces)
+      .values({ id: ws2, accountId: account2, name: 'Other', slug: `other-${id('ws')}` });
     foreignCategoryId = id('cat');
     await db
       .insert(categories)

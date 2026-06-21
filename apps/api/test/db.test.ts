@@ -4,6 +4,7 @@ import { createDrizzle, id, type Db } from '../src/db/index.js';
 import { runMigrations } from '../src/migrate.js';
 import { workspaces } from '../src/db/schema/index.js';
 import type { Sql } from '../src/db.js';
+import { seedAccount } from './helpers.js';
 
 /**
  * Integration test for the Drizzle schema + migrations. Gated behind
@@ -74,11 +75,12 @@ describeIfDb('database schema (integration)', () => {
 
   it('rejects a duplicate workspace slug', async () => {
     const slug = `it-${id('ws')}`;
+    const accountId = await seedAccount(db);
 
-    await db.insert(workspaces).values({ id: id('ws'), name: 'First', slug });
+    await db.insert(workspaces).values({ id: id('ws'), accountId, name: 'First', slug });
 
     await expect(
-      db.insert(workspaces).values({ id: id('ws'), name: 'Second', slug }),
+      db.insert(workspaces).values({ id: id('ws'), accountId, name: 'Second', slug }),
     ).rejects.toThrow();
 
     // Cleanup so repeated local runs stay green.

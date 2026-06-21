@@ -41,7 +41,12 @@ beforeEach(() => {
   search.mockReset().mockReturnValue({});
   signInEmail.mockReset();
   invalidateAuthMock.mockClear();
-  getAuthConfigMock.mockReset().mockResolvedValue({ githubEnabled: false, setupRequired: false });
+  getAuthConfigMock.mockReset().mockResolvedValue({
+    githubEnabled: false,
+    setupRequired: false,
+    signupMode: 'setup',
+    billingEnabled: false,
+  });
 });
 
 afterEach(() => vi.clearAllTimers());
@@ -95,7 +100,12 @@ describe('LoginPage', () => {
   });
 
   it('shows the GitHub button when GitHub is enabled', async () => {
-    getAuthConfigMock.mockResolvedValue({ githubEnabled: true, setupRequired: false });
+    getAuthConfigMock.mockResolvedValue({
+      githubEnabled: true,
+      setupRequired: false,
+      signupMode: 'setup',
+      billingEnabled: false,
+    });
     render(<LoginPage />);
     expect(
       await screen.findByRole('button', { name: /Continue with GitHub/i }),

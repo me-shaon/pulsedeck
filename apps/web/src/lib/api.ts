@@ -1,4 +1,5 @@
 import type {
+  Account,
   AlertItem,
   AuthConfig,
   CountBucket,
@@ -123,6 +124,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const getAuthConfig = (signal?: AbortSignal) =>
   request<AuthConfig>('/auth/config', { signal });
+
+/** The caller's billing account (limits + usage). OSS → all limits null. */
+export const getAccount = (signal?: AbortSignal) => request<Account>('/account', { signal });
 
 export const setup = (input: { name: string; email: string; password: string }) =>
   request<{ user: { id: string; email: string; name: string }; workspace: Workspace }>('/setup', {

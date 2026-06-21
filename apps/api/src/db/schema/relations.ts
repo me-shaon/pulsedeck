@@ -1,4 +1,5 @@
 import { relations } from 'drizzle-orm';
+import { billingAccounts } from './accounts.js';
 import { categories } from './categories.js';
 import { dashboards } from './dashboards.js';
 import { reportMetrics } from './report-metrics.js';
@@ -14,7 +15,15 @@ import { workspaceMembers, workspaces } from './workspaces.js';
  * query-builder convenience — these do not emit SQL or alter the migrations.
  */
 
-export const workspacesRelations = relations(workspaces, ({ many }) => ({
+export const billingAccountsRelations = relations(billingAccounts, ({ many }) => ({
+  workspaces: many(workspaces),
+}));
+
+export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
+  account: one(billingAccounts, {
+    fields: [workspaces.accountId],
+    references: [billingAccounts.id],
+  }),
   members: many(workspaceMembers),
   sources: many(sources),
   categories: many(categories),

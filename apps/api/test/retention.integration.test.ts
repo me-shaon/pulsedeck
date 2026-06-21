@@ -19,6 +19,7 @@ import {
   purgeExpiredReports,
   RETENTION_PURGE_LOCK,
 } from '../src/retention/index.js';
+import { seedAccount } from './helpers.js';
 
 /**
  * Phase 11 retention purge — DB-backed (gated on DATABASE_URL; skipped
@@ -65,13 +66,16 @@ describeIfDb('retention purge (integration)', () => {
     sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
-    await sql`TRUNCATE users, workspaces, workspace_members, invites, sources,
+    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, report_metrics, account, session, verification
       RESTART IDENTITY CASCADE`;
 
+    const accountId = await seedAccount(db);
     workspaceId = id('ws');
-    await db.insert(workspaces).values({ id: workspaceId, name: 'Ret', slug: `ret-${id('ws')}` });
+    await db
+      .insert(workspaces)
+      .values({ id: workspaceId, accountId, name: 'Ret', slug: `ret-${id('ws')}` });
     const categoryId = id('cat');
     await db.insert(categories).values({ id: categoryId, workspaceId, name: 'C', slug: 'c' });
     streamId = id('stm');

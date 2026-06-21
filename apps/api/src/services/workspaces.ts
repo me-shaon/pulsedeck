@@ -31,27 +31,29 @@ export async function insertWorkspaceWithOwner(
   tx: Tx,
   ownerId: string,
   name: string,
+  accountId: string,
 ): Promise<Workspace> {
   const workspaceId = id('ws');
   const slug = `${slugStem(name)}-${nanoid(6).toLowerCase()}`;
 
   const [workspace] = await tx
     .insert(workspaces)
-    .values({ id: workspaceId, name, slug })
+    .values({ id: workspaceId, accountId, name, slug })
     .returning();
   await tx.insert(workspaceMembers).values({ workspaceId, userId: ownerId, role: 'owner' });
   return workspace as Workspace;
 }
 
 /**
- * Create a workspace and make `ownerId` its Owner, atomically. The slug is the
- * name's stem plus a short random suffix to satisfy the unique constraint
- * without a retry loop.
+ * Create a workspace under `accountId` and make `ownerId` its Owner, atomically.
+ * The slug is the name's stem plus a short random suffix to satisfy the unique
+ * constraint without a retry loop.
  */
 export async function createWorkspaceWithOwner(
   db: Db,
   ownerId: string,
   name: string,
+  accountId: string,
 ): Promise<Workspace> {
-  return db.transaction((tx) => insertWorkspaceWithOwner(tx, ownerId, name));
+  return db.transaction((tx) => insertWorkspaceWithOwner(tx, ownerId, name, accountId));
 }

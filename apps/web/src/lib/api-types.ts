@@ -13,9 +13,37 @@ export type Role = 'owner' | 'admin' | 'editor' | 'viewer';
 export type SourceScope = 'workspace' | 'category' | 'stream';
 export type SourceStatus = 'active' | 'stale' | 'never';
 
+export type SignupMode = 'setup' | 'open' | 'invite';
+
 export interface AuthConfig {
   githubEnabled: boolean;
   setupRequired: boolean;
+  /** How new accounts/users may be created (drives signup UI). */
+  signupMode: SignupMode;
+  /** Whether billing UI is active. OSS → false (hide all billing/usage UI). */
+  billingEnabled: boolean;
+}
+
+/**
+ * The caller's billing account: limits + current usage. `null` on any limit
+ * means unlimited (OSS) → the web renders no meters/upgrade prompts; cloud
+ * returns real numbers and the same components show usage.
+ */
+export interface AccountLimits {
+  retentionDays: number | null;
+  maxSeats: number | null;
+  maxWorkspaces: number | null;
+}
+
+export interface AccountUsage {
+  workspaces: number;
+  seats: number;
+}
+
+export interface Account {
+  id: string;
+  limits: AccountLimits;
+  usage: AccountUsage;
 }
 
 export interface SessionUser {

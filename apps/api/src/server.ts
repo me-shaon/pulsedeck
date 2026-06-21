@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { createAuth, type Auth, type AuthEnv } from './auth/auth.js';
 import { registerAuthHandler } from './auth/fastify.js';
+import { buildRuntimeConfig, type RuntimeConfig } from './config/runtime.js';
 import { createDrizzle, type Db } from './db/index.js';
 import type { Sql } from './db.js';
 import { ingestionBus } from './events/ingestion.js';
@@ -24,6 +25,8 @@ declare module 'fastify' {
     auth: Auth;
     /** Auth-relevant env, exposed so `/auth/config` can report capabilities. */
     authEnv: AuthEnv;
+    /** Deployment runtime config (mode, signup, billing); drives capabilities. */
+    runtime: RuntimeConfig;
     /** Retention sweep runner; `start()`ed in index.ts, status read by /healthz. */
     retention: RetentionRunner;
   }
@@ -46,6 +49,8 @@ export interface BuildServerOptions {
   /** Pre-built realtime layer; defaults to `createRealtime({ bus, redisUrl })`.
    * Injectable so tests can supply a fake or a Redis-backed instance. */
   realtime?: Realtime;
+  /** Deployment runtime config; defaults to self-host (`buildRuntimeConfig({})`). */
+  runtime?: RuntimeConfig;
   /** Retention window in days (env `RETENTION_DAYS`). 0/omitted → disabled. */
   retentionDays?: number;
   /** Retention sweep cadence in ms (env `RETENTION_SWEEP_INTERVAL_MS`). */
@@ -69,6 +74,7 @@ export function buildServer({
   redisUrl,
   sseEnabled = true,
   realtime,
+  runtime = buildRuntimeConfig({}),
   retentionDays = 0,
   retentionSweepIntervalMs = 3_600_000,
   retention,
@@ -82,6 +88,7 @@ export function buildServer({
   app.decorate('db', dbInstance);
   app.decorate('auth', authInstance);
   app.decorate('authEnv', env);
+  app.decorate('runtime', runtime);
   // In-process ingestion event bus; the SSE/webhook fan-out attaches here later
   // and Phase 10 can swap the singleton for a Redis-backed bus transparently.
   app.decorate('ingestionBus', ingestionBus);
@@ -119,6 +126,7 @@ export function buildServer({
       db: dbInstance,
       sql,
       retentionDays,
+      perAccountEnabled: runtime.perAccountRetention,
       sweepIntervalMs: retentionSweepIntervalMs,
       logger: {
         info: (o, m) => app.log.info(o, m),

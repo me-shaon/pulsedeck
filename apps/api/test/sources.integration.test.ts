@@ -65,7 +65,7 @@ describeIfDb('sources: registration & management (integration)', () => {
     sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
-    await sql`TRUNCATE users, workspaces, workspace_members, invites, sources,
+    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, account, session, verification RESTART IDENTITY CASCADE`;
 

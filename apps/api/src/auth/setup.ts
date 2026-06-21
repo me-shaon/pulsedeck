@@ -1,8 +1,8 @@
 import { count, eq } from 'drizzle-orm';
 import type { Db } from '../db/index.js';
-import { users, type Workspace } from '../db/index.js';
+import { users, type BillingAccount, type Workspace } from '../db/index.js';
 import type { Sql } from '../db.js';
-import { createWorkspaceWithOwner } from '../services/workspaces.js';
+import { provisionAccountWithWorkspace } from '../services/accounts.js';
 import type { Auth } from './auth.js';
 
 /** Advisory-lock key serializing first-admin provisioning across requests/replicas. */
@@ -44,6 +44,7 @@ export interface AdminInput {
 
 export interface ProvisionedAdmin {
   userId: string;
+  account: BillingAccount;
   workspace: Workspace;
   /** Headers from better-auth sign-up (carries the session Set-Cookie). */
   headers: Headers;
@@ -84,12 +85,15 @@ export async function provisionFirstAdmin(
     });
     createdUserId = response.user.id;
 
-    const workspace = await createWorkspaceWithOwner(
+    // One implicit account (limits null = unlimited) + the admin's Owner
+    // workspace under it. Cloud signup reuses the same provisioner.
+    const { account, workspace } = await provisionAccountWithWorkspace(
       db,
       createdUserId,
+      `${input.name}'s Account`,
       `${input.name}'s Workspace`,
     );
-    return { userId: createdUserId, workspace, headers };
+    return { userId: createdUserId, account, workspace, headers };
   } catch (err) {
     // If workspace creation failed after better-auth committed the user, remove
     // the orphan so the zero-users condition (and /setup) is restored rather

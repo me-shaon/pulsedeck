@@ -69,6 +69,13 @@ export interface RetentionRunnerOptions {
   db: Db;
   sql: Sql;
   retentionDays: number;
+  /**
+   * Honor per-account retention windows even when the global `retentionDays` is
+   * 0 (cloud). When true the sweep is armed regardless of the global default;
+   * the per-account effective window is resolved inside the purge. Defaults
+   * false so OSS retention stays opt-in via `RETENTION_DAYS`.
+   */
+  perAccountEnabled?: boolean;
   sweepIntervalMs: number;
   /** Delay before the FIRST sweep after `start()`. Defaults to min(interval, 30s). */
   initialDelayMs?: number;
@@ -100,13 +107,16 @@ export function createRetentionRunner(opts: RetentionRunnerOptions): RetentionRu
     db,
     sql,
     retentionDays,
+    perAccountEnabled = false,
     sweepIntervalMs,
     now = () => new Date(),
     logger = noopLogger,
     purge = purgeExpiredReports,
   } = opts;
 
-  const enabled = retentionDays > 0;
+  // Armed when a global window is set OR per-account windows must be honored
+  // (cloud). OSS default: off unless RETENTION_DAYS > 0.
+  const enabled = retentionDays > 0 || perAccountEnabled;
   const initialDelayMs = opts.initialDelayMs ?? Math.min(sweepIntervalMs, 30_000);
 
   let timer: NodeJS.Timeout | null = null;

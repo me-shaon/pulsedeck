@@ -6,6 +6,7 @@
 
 export * from './enums.js';
 export * from './columns.js';
+export * from './accounts.js';
 export * from './users.js';
 export * from './auth.js';
 export * from './invites.js';

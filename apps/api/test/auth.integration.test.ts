@@ -64,7 +64,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
     await runMigrations(sql);
 
     // Clean slate so the zero-users setup flow is deterministic.
-    await sql`TRUNCATE users, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
+    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
 
     auth = createAuth(db, AUTH_ENV);
     app = buildServer({ sql, env: AUTH_ENV, auth });
@@ -79,7 +79,12 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
   it('reports setupRequired=true and githubEnabled=false at zero users', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/auth/config' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ githubEnabled: false, setupRequired: true });
+    expect(res.json()).toEqual({
+      githubEnabled: false,
+      setupRequired: true,
+      signupMode: 'setup',
+      billingEnabled: false,
+    });
   });
 
   it('POST /setup creates the first admin as Owner of a workspace', async () => {

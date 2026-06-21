@@ -5,6 +5,14 @@ import { z } from 'zod';
 import { canGrantRole } from '../auth/rbac.js';
 import { makeRequireAuth, makeRequireWorkspaceRole } from '../auth/fastify.js';
 import { id, invites, users, workspaceMembers, workspaces } from '../db/index.js';
+import { accountIdForUser } from '../services/accounts.js';
+import {
+  assertCanAddSeat,
+  assertCanAddWorkspace,
+  countSeats,
+  countWorkspaces,
+  getAccountLimits,
+} from '../services/limits.js';
 import { createWorkspaceWithOwner } from '../services/workspaces.js';
 
 /**
@@ -52,6 +60,28 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     return rows.length;
   }
 
+  // --- Account --------------------------------------------------------------
+
+  /**
+   * The caller's account: limits + current usage. `null` limits mean unlimited
+   * (OSS), so the web renders no meters/upgrade prompts; cloud returns real
+   * numbers and the same components show usage. Auth only.
+   */
+  app.get('/api/v1/account', { preHandler: [requireAuth] }, async (request, reply) => {
+    const accountId = await accountIdForUser(db, request.user!.id);
+    if (!accountId) return reply.code(404).send({ error: 'No account for user' });
+    const [limits, workspaceCount, seatCount] = await Promise.all([
+      getAccountLimits(db, accountId),
+      countWorkspaces(db, accountId),
+      countSeats(db, accountId),
+    ]);
+    return reply.send({
+      id: accountId,
+      limits,
+      usage: { workspaces: workspaceCount, seats: seatCount },
+    });
+  });
+
   // --- Workspaces -----------------------------------------------------------
 
   /** List the caller's workspaces with their role. Auth only (membership-scoped). */
@@ -76,7 +106,11 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', issues: parsed.error.issues });
     }
-    const workspace = await createWorkspaceWithOwner(db, request.user!.id, parsed.data.name);
+    // New workspaces join the caller's existing account; enforce its quota.
+    const accountId = await accountIdForUser(db, request.user!.id);
+    if (!accountId) return reply.code(403).send({ error: 'No account for user' });
+    await assertCanAddWorkspace(db, accountId);
+    const workspace = await createWorkspaceWithOwner(db, request.user!.id, parsed.data.name, accountId);
     return reply.code(201).send({ workspace });
   });
 
@@ -294,6 +328,14 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const userId = request.user!.id;
+    // Enforce the account's seat quota before consuming the invite. An existing
+    // member (re-accept / role change) does not consume a new seat.
+    const [target] = await db
+      .select({ accountId: workspaces.accountId })
+      .from(workspaces)
+      .where(eq(workspaces.id, invite.workspaceId))
+      .limit(1);
+    if (target) await assertCanAddSeat(db, target.accountId, userId);
     // Single-use enforcement is an atomic compare-and-swap: the UPDATE only
     // matches while `accepted_at IS NULL`, so of two concurrent accepts of the
     // same token exactly one consumes it; the loser sees 0 rows → 409. The

@@ -15,6 +15,7 @@ import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { createRetentionRunner, type RetentionRunner } from './retention/index.js';
+import { createConsoleEmailPort, type EmailPort } from './services/email.js';
 
 // Shared singletons are decorated onto the app so every route/plugin reads them
 // off `app` instead of re-threading them through registration options.
@@ -27,6 +28,8 @@ declare module 'fastify' {
     authEnv: AuthEnv;
     /** Deployment runtime config (mode, signup, billing); drives capabilities. */
     runtime: RuntimeConfig;
+    /** Transactional email port; console no-op in OSS, real provider in cloud. */
+    email: EmailPort;
     /** Retention sweep runner; `start()`ed in index.ts, status read by /healthz. */
     retention: RetentionRunner;
   }
@@ -51,6 +54,9 @@ export interface BuildServerOptions {
   realtime?: Realtime;
   /** Deployment runtime config; defaults to self-host (`buildRuntimeConfig({})`). */
   runtime?: RuntimeConfig;
+  /** Transactional email port; defaults to the console no-op (OSS). Injectable
+   * so the cloud package can bind a real provider and tests can assert sends. */
+  email?: EmailPort;
   /** Retention window in days (env `RETENTION_DAYS`). 0/omitted → disabled. */
   retentionDays?: number;
   /** Retention sweep cadence in ms (env `RETENTION_SWEEP_INTERVAL_MS`). */
@@ -75,6 +81,7 @@ export function buildServer({
   sseEnabled = true,
   realtime,
   runtime = buildRuntimeConfig({}),
+  email,
   retentionDays = 0,
   retentionSweepIntervalMs = 3_600_000,
   retention,
@@ -89,6 +96,10 @@ export function buildServer({
   app.decorate('auth', authInstance);
   app.decorate('authEnv', env);
   app.decorate('runtime', runtime);
+  // Transactional email. OSS default: the console no-op port (logs, sends
+  // nothing) so a self-host deploy with no mail provider still works and invites
+  // surface their URL in the API response. The cloud package injects a real one.
+  app.decorate('email', email ?? createConsoleEmailPort({ info: (o, m) => app.log.info(o, m) }));
   // In-process ingestion event bus; the SSE/webhook fan-out attaches here later
   // and Phase 10 can swap the singleton for a Redis-backed bus transparently.
   app.decorate('ingestionBus', ingestionBus);
@@ -154,7 +165,8 @@ export function buildServer({
   });
 
   // better-auth's own endpoints (sign-in/up, OAuth callbacks, sign-out, …).
-  registerAuthHandler(app, authInstance);
+  // `runtime` lets the handler gate self-serve sign-up by signup mode.
+  registerAuthHandler(app, authInstance, runtime);
 
   app.register(healthRoutes);
   app.register(authRoutes);

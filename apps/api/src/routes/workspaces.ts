@@ -277,6 +277,22 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
         .returning();
 
       const base = app.authEnv.BETTER_AUTH_URL ?? '';
+      const inviteUrl = `${base}/invite/${token}`;
+
+      // Hand the invite to the email port. OSS binds the console no-op (nothing
+      // sent — the URL below is the delivery channel); cloud binds a real
+      // provider. A send failure must not fail invite creation, so it's logged
+      // and swallowed — the URL is still returned.
+      if (invite.email) {
+        await app.email
+          .send({
+            to: invite.email,
+            template: 'workspace-invite',
+            data: { inviteUrl, role: invite.role, workspaceId },
+          })
+          .catch((err) => app.log.error({ err }, 'invite email send failed'));
+      }
+
       return reply.code(201).send({
         invite: {
           id: invite.id,
@@ -284,7 +300,7 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
           email: invite.email,
           token: invite.token,
           expiresAt: invite.expiresAt,
-          inviteUrl: `${base}/invite/${token}`,
+          inviteUrl,
         },
       });
     },

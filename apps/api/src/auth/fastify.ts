@@ -1,9 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
+import type { RuntimeConfig } from '../config/runtime.js';
 import type { Db } from '../db/index.js';
 import { workspaceMembers } from '../db/schema/index.js';
 import type { Auth, AuthUser } from './auth.js';
 import { can, type Action, type Role } from './rbac.js';
+import { isSignupAllowed, SignupNotAllowedError } from './signup-policy.js';
 
 /**
  * Bridge between Fastify and better-auth, which speaks the WHATWG
@@ -69,12 +71,31 @@ export function toWebRequest(request: FastifyRequest): Request {
  * Multiple `Set-Cookie` headers are preserved via `Headers.getSetCookie()` —
  * iterating with `forEach` would otherwise fold them into one comma-joined
  * value and break session cookies.
+ *
+ * Public self-serve sign-up (`POST /api/auth/sign-up/*`) is gated by the
+ * deployment's signup mode. This route is never the first-run path (that's the
+ * dedicated `/api/v1/setup` wizard, which provisions server-side), so the policy
+ * is evaluated with `isFirstRun: false`: open → allowed, setup/invite → 403. OSS
+ * self-host (mode `setup`) therefore never mints accountless users here.
  */
-export function registerAuthHandler(app: FastifyInstance, auth: Auth): void {
+export function registerAuthHandler(
+  app: FastifyInstance,
+  auth: Auth,
+  runtime: RuntimeConfig,
+): void {
   app.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
     async handler(request, reply) {
+      if (
+        request.method === 'POST' &&
+        request.url.split('?')[0].startsWith('/api/auth/sign-up') &&
+        !isSignupAllowed(runtime.signupMode, { isFirstRun: false })
+      ) {
+        const err = new SignupNotAllowedError(runtime.signupMode);
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+
       const response = await auth.handler(toWebRequest(request));
 
       reply.status(response.status);

@@ -51,6 +51,21 @@ const EnvSchema = z.object({
   // Public origin better-auth uses to build OAuth callback URLs and validate
   // origins. Optional: only needed for social login / cross-origin clients.
   BETTER_AUTH_URL: z.string().url('BETTER_AUTH_URL must be a valid URL').optional(),
+
+  // Per-source ingestion rate limit (PRD "per-source rate limits"). Read here so
+  // no route reaches into process.env directly.
+  //   INGEST_RATE_LIMIT  — max requests per window (default 120).
+  //   INGEST_RATE_WINDOW — window as ms (number) or an `ms`-style string like
+  //                        "1 minute" (default 60000 ms).
+  INGEST_RATE_LIMIT: z.coerce.number().int().positive().default(120),
+  INGEST_RATE_WINDOW: z.string().optional(),
+
+  // Transactional email seam (invites now; trial reminders/receipts later in
+  // cloud). OSS leaves EMAIL_PROVIDER unset → the console no-op port: nothing is
+  // sent, no provider is required, invites still surface their URL in the API
+  // response. The cloud package binds a real provider keyed off these.
+  EMAIL_PROVIDER: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

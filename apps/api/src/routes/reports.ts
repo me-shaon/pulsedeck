@@ -40,25 +40,6 @@ declare module 'fastify' {
  */
 const BODY_LIMIT_CEILING = MAX_PAYLOAD_BYTES * 2;
 
-/**
- * Per-source rate-limit config (PRD "per-source rate limits"), env-overridable:
- *   - `INGEST_RATE_LIMIT`  — max requests per window (default 120).
- *   - `INGEST_RATE_WINDOW` — window as ms (number) or an `ms`-style string like
- *     `"1 minute"` (default 60_000 ms).
- */
-function rateLimitConfig(): { max: number; timeWindow: string | number } {
-  const maxRaw = Number(process.env.INGEST_RATE_LIMIT);
-  const max = Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : 120;
-
-  const windowRaw = process.env.INGEST_RATE_WINDOW?.trim();
-  let timeWindow: string | number = 60_000;
-  if (windowRaw) {
-    const asNumber = Number(windowRaw);
-    timeWindow = Number.isFinite(asNumber) && asNumber > 0 ? asNumber : windowRaw;
-  }
-  return { max, timeWindow };
-}
-
 function readIdempotencyKey(request: FastifyRequest): string | null {
   const raw = request.headers['idempotency-key'];
   const value = (Array.isArray(raw) ? raw[0] : raw)?.trim();
@@ -90,7 +71,8 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   // `request.source`, so we derive the same identity straight from the header.
   // Unauthenticated requests fall back to IP (they 401 at the preHandler anyway).
   await app.register(rateLimit, {
-    ...rateLimitConfig(),
+    max: app.runtime.ingest.max,
+    timeWindow: app.runtime.ingest.timeWindow,
     keyGenerator(request) {
       const header = request.headers.authorization;
       if (header?.startsWith('Bearer ')) {

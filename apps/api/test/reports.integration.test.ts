@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuth, type Auth, type AuthEnv } from '../src/auth/auth.js';
+import { buildRuntimeConfig } from '../src/config/runtime.js';
 import { categories, createDrizzle, id, reportMetrics, reports, type Db } from '../src/db/index.js';
 import type { Sql } from '../src/db.js';
 import { ingestionBus, type ReportIngestedEvent } from '../src/events/ingestion.js';
@@ -121,10 +122,6 @@ describeIfDb('reports: ingestion API (integration)', () => {
   }
 
   beforeAll(async () => {
-    // Effectively disable per-source rate limiting for the main app; a dedicated
-    // test below builds a separate app with a tiny limit.
-    process.env.INGEST_RATE_LIMIT = '100000';
-
     sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
@@ -134,7 +131,10 @@ describeIfDb('reports: ingestion API (integration)', () => {
       RESTART IDENTITY CASCADE`;
 
     auth = createAuth(db, AUTH_ENV);
-    app = buildServer({ sql, env: AUTH_ENV, auth });
+    // Effectively disable per-source rate limiting for the main app; a dedicated
+    // test below builds a separate app with a tiny limit.
+    const runtime = buildRuntimeConfig({ INGEST_RATE_LIMIT: 100_000 });
+    app = buildServer({ sql, env: AUTH_ENV, auth, runtime });
     await app.ready();
 
     const setup = await app.inject({ method: 'POST', url: '/api/v1/setup', payload: admin });
@@ -392,9 +392,8 @@ describeIfDb('reports: ingestion API (integration)', () => {
   // --- Rate limiting (dedicated app with a tiny limit) ----------------------
 
   it('exceeding the per-source rate limit → 429', async () => {
-    const prev = process.env.INGEST_RATE_LIMIT;
-    process.env.INGEST_RATE_LIMIT = '2';
-    const app2 = buildServer({ sql, env: AUTH_ENV, auth });
+    const runtime = buildRuntimeConfig({ INGEST_RATE_LIMIT: 2 });
+    const app2 = buildServer({ sql, env: AUTH_ENV, auth, runtime });
     await app2.ready();
     try {
       const inject = () =>
@@ -412,7 +411,6 @@ describeIfDb('reports: ingestion API (integration)', () => {
       expect(r3.statusCode).toBe(429);
     } finally {
       await app2.close();
-      process.env.INGEST_RATE_LIMIT = prev;
     }
   });
 });

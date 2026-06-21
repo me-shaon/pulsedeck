@@ -35,6 +35,20 @@ export interface RuntimeConfig {
    * applies.
    */
   perAccountRetention: boolean;
+  /** Per-source ingestion rate limit (env `INGEST_RATE_*`). */
+  ingest: {
+    /** Max requests per window. */
+    max: number;
+    /** Window as ms (number) or an `ms`-style string (e.g. "1 minute"). */
+    timeWindow: number | string;
+  };
+  /** Transactional email config (env `EMAIL_*`). Provider unset → console no-op. */
+  email: {
+    /** Logical provider name; unset in OSS (console no-op). Cloud binds a real one. */
+    provider?: string;
+    /** From address used by a configured provider. */
+    from?: string;
+  };
 }
 
 /**
@@ -42,8 +56,29 @@ export interface RuntimeConfig {
  * optional so a bare `buildRuntimeConfig({})` yields the self-host defaults.
  */
 export type RuntimeConfigEnv = Partial<
-  Pick<Env, 'DEPLOYMENT_MODE' | 'SIGNUP_MODE' | 'BILLING_ENABLED'>
+  Pick<
+    Env,
+    | 'DEPLOYMENT_MODE'
+    | 'SIGNUP_MODE'
+    | 'BILLING_ENABLED'
+    | 'INGEST_RATE_LIMIT'
+    | 'INGEST_RATE_WINDOW'
+    | 'EMAIL_PROVIDER'
+    | 'EMAIL_FROM'
+  >
 >;
+
+/** Default per-source ingestion rate limit when env is unset. */
+const DEFAULT_INGEST_MAX = 120;
+const DEFAULT_INGEST_WINDOW_MS = 60_000;
+
+/** Resolve the ingest window: a numeric string → ms number, else the raw string. */
+function resolveIngestWindow(raw: string | undefined): number | string {
+  const trimmed = raw?.trim();
+  if (!trimmed) return DEFAULT_INGEST_WINDOW_MS;
+  const asNumber = Number(trimmed);
+  return Number.isFinite(asNumber) && asNumber > 0 ? asNumber : trimmed;
+}
 
 /**
  * Derive the typed runtime config from env. Granular flags fall back to
@@ -59,5 +94,13 @@ export function buildRuntimeConfig(env: RuntimeConfigEnv): RuntimeConfig {
     billingEnabled: env.BILLING_ENABLED ?? isCloud,
     multiAccount: isCloud,
     perAccountRetention: isCloud,
+    ingest: {
+      max: env.INGEST_RATE_LIMIT ?? DEFAULT_INGEST_MAX,
+      timeWindow: resolveIngestWindow(env.INGEST_RATE_WINDOW),
+    },
+    email: {
+      provider: env.EMAIL_PROVIDER,
+      from: env.EMAIL_FROM,
+    },
   };
 }

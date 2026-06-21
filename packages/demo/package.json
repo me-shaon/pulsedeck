@@ -2,6 +2,7 @@
   "name": "@pulsedeck/demo",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "description": "PulseDeck demo agent — registers as a source and pushes realistic fake reports over the real HTTP protocol so a fresh dashboard fills in under two minutes.",
   "bin": {

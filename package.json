@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Self-hostable dashboard where AI agents push structured reports.",
+  "license": "AGPL-3.0-or-later",
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=22"

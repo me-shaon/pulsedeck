@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  ApiError,
-  getAuthConfig,
-  listReports,
-  removeMember,
-  setup,
-} from './api';
+import { ApiError, getAuthConfig, listReports, removeMember, setup } from './api';
 
 /**
  * Unit tests for the typed `fetch` wrapper. We stub the global `fetch` and

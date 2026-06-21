@@ -146,9 +146,7 @@ function PasswordCard() {
               onChange={(e) => setNext(e.target.value)}
             />
             {tooShort ? (
-              <span className="text-xs text-severity-critical">
-                Use at least 8 characters.
-              </span>
+              <span className="text-xs text-severity-critical">Use at least 8 characters.</span>
             ) : null}
           </label>
           <label className="flex flex-col gap-1.5">

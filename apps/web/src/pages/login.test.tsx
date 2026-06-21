@@ -87,9 +87,7 @@ describe('LoginPage', () => {
     render(<LoginPage />);
     await signInWith('a@b.com', 'supersecret1');
 
-    await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ to: '/w/acme/settings' }),
-    );
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/w/acme/settings' }));
   });
 
   it('hides the GitHub button when GitHub is disabled', async () => {

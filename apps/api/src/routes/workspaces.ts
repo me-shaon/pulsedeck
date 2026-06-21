@@ -110,7 +110,12 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     const accountId = await accountIdForUser(db, request.user!.id);
     if (!accountId) return reply.code(403).send({ error: 'No account for user' });
     await assertCanAddWorkspace(db, accountId);
-    const workspace = await createWorkspaceWithOwner(db, request.user!.id, parsed.data.name, accountId);
+    const workspace = await createWorkspaceWithOwner(
+      db,
+      request.user!.id,
+      parsed.data.name,
+      accountId,
+    );
     return reply.code(201).send({ workspace });
   });
 

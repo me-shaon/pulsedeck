@@ -27,7 +27,9 @@ export function ReportMetaHeader({ ws, report }: { ws: string; report: ReportDet
       </nav>
 
       <div className="flex items-start justify-between gap-4">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">{report.title}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+          {report.title}
+        </h1>
         {report.severity ? (
           <Badge variant={severityVariant(report.severity)} dot className="mt-1 shrink-0">
             {titleCase(report.severity)}

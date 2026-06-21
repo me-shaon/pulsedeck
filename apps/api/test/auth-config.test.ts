@@ -23,7 +23,10 @@ describe('createAuth — base URL / trusted origins', () => {
   });
 
   it('mounts at the conventional /api/auth basePath', () => {
-    const auth = createAuth(stubDb, { AUTH_SECRET: SECRET, BETTER_AUTH_URL: 'http://localhost:3000' });
+    const auth = createAuth(stubDb, {
+      AUTH_SECRET: SECRET,
+      BETTER_AUTH_URL: 'http://localhost:3000',
+    });
     expect(auth.options.basePath).toBe('/api/auth');
   });
 

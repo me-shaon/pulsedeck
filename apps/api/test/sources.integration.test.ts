@@ -190,7 +190,8 @@ describeIfDb('sources: registration & management (integration)', () => {
       method: 'POST',
       url: '/api/v1/sources/register',
       headers: { 'x-registration-token': regToken },
-      payload: { name: 'Hermes Prod', agent_version: '2.1.0' },
+      // A name in the register body must NOT overwrite the dashboard-set name.
+      payload: { name: 'Agent Self-Name', agent_version: '2.1.0' },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -205,7 +206,8 @@ describeIfDb('sources: registration & management (integration)', () => {
       headers: { cookie: adminCookie },
     });
     const row = list.json().sources.find((s: { id: string }) => s.id === sourceId);
-    expect(row).toMatchObject({ status: 'active', agentVersion: '2.1.0' });
+    // Name stays the operator's 'Hermes Prod', not the agent's self-reported name.
+    expect(row).toMatchObject({ status: 'active', agentVersion: '2.1.0', name: 'Hermes Prod' });
   });
 
   it('the registration token is now single-use (second use → 409)', async () => {

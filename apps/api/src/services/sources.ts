@@ -298,11 +298,16 @@ export type RegisterResult =
  * key. Single-use is enforced by a compare-and-swap on `used_at IS NULL` — of
  * two concurrent redemptions of the same token exactly one wins; the loser sees
  * `used`. Distinguishes unknown/expired/used so the route can map status codes.
+ *
+ * The source name is owned by the dashboard (set at "Add source") — the agent's
+ * self-reported name is NOT applied here, so completing the handshake never
+ * silently renames a source the operator already named. Only `agent_version` is
+ * recorded from the agent.
  */
 export async function registerSource(
   db: Db,
   rawToken: string,
-  meta: { name?: string; agentVersion?: string },
+  meta: { agentVersion?: string },
 ): Promise<RegisterResult> {
   const tokenHash = hashToken(rawToken);
 
@@ -335,7 +340,6 @@ export async function registerSource(
       lastSeenAt: new Date(),
     };
     if (meta.agentVersion) patch.agentVersion = meta.agentVersion;
-    if (meta.name) patch.name = meta.name;
 
     await tx.update(sources).set(patch).where(eq(sources.id, token.sourceId));
 
@@ -404,7 +408,7 @@ You have a one-time registration token (expires in 24h):
 Call:
   POST ${baseUrl}/api/v1/sources/register
   Header: X-Registration-Token: ${regToken}
-  Body:   { "name": "<your agent name>", "agent_version": "<your version>" }
+  Body:   { "agent_version": "<your version>" }   # the source name is set in the dashboard
 
 Response:
   { "source_id": "src_...", "api_key": "pd_...", "schema": { ... } }

@@ -21,7 +21,6 @@ import { randomUUID } from 'node:crypto';
 import { TEMPLATES, type ReportInput } from './templates.js';
 
 const SCHEMA_VERSION = '1.0';
-const AGENT_NAME = 'PulseDeck Demo Agent';
 const AGENT_VERSION = '1.0.0';
 const DEFAULT_INTERVAL_MS = 30_000;
 
@@ -156,7 +155,9 @@ interface Registration {
 
 async function register(opts: CliOptions): Promise<Registration> {
   const endpoint = `${opts.url}/api/v1/sources/register`;
-  console.log(`→ Registering "${AGENT_NAME}" at ${endpoint}`);
+  // The source name is set in the dashboard ("Add source"); the agent only
+  // reports its version, so it never overwrites the operator-chosen name.
+  console.log(`→ Registering at ${endpoint}`);
 
   let res: Response;
   try {
@@ -166,7 +167,7 @@ async function register(opts: CliOptions): Promise<Registration> {
         'Content-Type': 'application/json',
         'X-Registration-Token': opts.token,
       },
-      body: JSON.stringify({ name: AGENT_NAME, agent_version: AGENT_VERSION }),
+      body: JSON.stringify({ agent_version: AGENT_VERSION }),
     });
   } catch (err) {
     console.error(`\n✖ Could not reach ${endpoint}.`);

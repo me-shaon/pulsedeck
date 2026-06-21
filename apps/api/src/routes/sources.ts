@@ -50,6 +50,9 @@ const UpdateSourceBody = z
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'No fields to update' });
 
+// The source name is owned by the dashboard (set at "Add source"); a name in
+// the register body is accepted for backward-compatibility but ignored, so the
+// handshake never renames an operator-named source. Only agent_version is read.
 const RegisterBody = z.object({
   name: z.string().min(1).max(120).optional(),
   agent_version: z.string().min(1).max(60).optional(),
@@ -132,7 +135,6 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const result = await registerSource(db, token, {
-      name: parsed.data.name,
       agentVersion: parsed.data.agent_version,
     });
 

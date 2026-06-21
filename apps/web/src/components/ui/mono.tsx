@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 /**
  * Machine-identifier text role. Use for agent-generated, machine-stable strings
  * only: source ids (src_…), api keys (pd_…), metric `key`s, ISO timestamps,
- * idempotency keys. Geist Mono + tabular figures = "this came from a machine".
+ * idempotency keys. JetBrains Mono + tabular figures = "this came from a machine".
  */
 export interface MonoProps extends React.HTMLAttributes<HTMLElement> {
   as?: 'span' | 'code' | 'div' | 'p';

@@ -25,6 +25,7 @@ import { ReportDetailPage } from '@/pages/report-detail';
 import { SearchPage } from '@/pages/search';
 import { SourcesPage } from '@/pages/sources';
 import { SettingsPage } from '@/pages/settings';
+import { AccountPage } from '@/pages/account';
 import type { Role, Workspace } from '@/lib/api-types';
 
 export interface RouterContext {
@@ -212,6 +213,12 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const accountRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
+  path: 'account',
+  component: AccountPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   setupRoute,
@@ -228,6 +235,7 @@ const routeTree = rootRoute.addChildren([
     reportDetailRoute,
     sourcesRoute,
     settingsRoute,
+    accountRoute,
   ]),
 ]);
 

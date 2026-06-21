@@ -3,7 +3,7 @@
 /*
  * PulseDeck design tokens.
  * Identity: calm instrument panel meets editorial briefing.
- * - Brand "Pulse" (iris-violet) is kept OUTSIDE the semantic palette so domain
+ * - Brand "Pulse" (signal teal) is kept OUTSIDE the semantic palette so domain
  *   status (severity / status / sentiment) is never visually ambiguous.
  * - All component colors read from CSS variables; light + dark are first-class.
  */
@@ -24,10 +24,11 @@
   --ink: #0c0e14;
   --muted: #6b7280;
 
-  /* Brand "Pulse" — iris-violet. Used sparingly. */
-  --brand: #6e56cf;
-  --brand-strong: #5b45b0; /* active / pressed */
-  --brand-fg: #ffffff;
+  /* Brand "Pulse" — signal teal. Used sparingly. Deepened on light surfaces so
+     teal text and fills clear AA against white. */
+  --brand: #0b7a6c;
+  --brand-strong: #075d52; /* active / pressed */
+  --brand-fg: #ffffff; /* white label on deep-teal fill */
   --brand-tint: color-mix(in srgb, var(--brand) 12%, var(--surface));
   --primary: var(--brand); /* primary button fill */
   --primary-hover: var(--brand-strong);
@@ -58,9 +59,9 @@
   --tint-green-bg: #e6f6ef;
   --tint-green-fg: #047857;
   --tint-gray-bg: #f1f2f4;
-  --tint-violet-bg: #eeebfa;
+  --tint-teal-bg: #d8f5ee;
   --tint-gray-fg: #4b5563;
-  --tint-violet-fg: #5b45b0;
+  --tint-teal-fg: #096658;
 
   /* Focus ring = brand */
   --ring: var(--brand);
@@ -72,18 +73,23 @@
  * RAW TOKENS — dark theme (first-class)
  * ------------------------------------------------------------------------- */
 .dark {
-  --bg: #0b0d12;
-  --surface: #13161d;
-  --surface-2: #1a1e27;
-  --surface-hover: #1f242f;
-  --border: #222630;
-  --border-strong: #2d323e;
-  --ink: #e8eaf0;
-  --muted: #8a90a0;
+  /* Brand-sheet neutrals: cool blue-black. bg/surface/muted are exact from the
+     palette; raised + border steps derived on the same hue for a smooth ramp. */
+  --bg: #080e14;
+  --surface: #161b26;
+  --surface-2: #1d2433;
+  --surface-hover: #232b3b;
+  --border: #262e3e;
+  --border-strong: #333c4f;
+  --ink: #e6eaf0;
+  /* Brand sheet's #5b6675 is too dim for text on #080e14 (~3.2:1). Lifted to a
+     cool gray that clears AA (~5.5:1) for muted body/labels. The deeper tone is
+     kept for chrome via --border-strong. */
+  --muted: #8d97a8;
 
-  --brand: #7c6bf0;
-  --brand-strong: #9486f5;
-  --brand-fg: #ffffff;
+  --brand: #2ee6c5;
+  --brand-strong: #5cefd6;
+  --brand-fg: #04211c; /* dark label on bright-teal fill (teal is too light for white) */
   --brand-tint: color-mix(in srgb, var(--brand) 18%, var(--surface));
 
   --severity-info: #60a5fa;
@@ -110,12 +116,12 @@
   --tint-green-fg: #6ee7b7;
   --tint-gray-bg: color-mix(in srgb, #9ca3af 20%, transparent);
   --tint-gray-fg: #d1d5db;
-  --tint-violet-bg: color-mix(in srgb, #7c6bf0 24%, transparent);
-  --tint-violet-fg: #c9bef9;
+  --tint-teal-bg: color-mix(in srgb, #2ee6c5 22%, transparent);
+  --tint-teal-fg: #7af3de;
 
-  /* Primary button slightly deepened so white label text clears AA on dark. */
-  --primary: #6b57e0;
-  --primary-hover: #7c6bf0;
+  /* Primary button = signal teal; dark label (via --brand-fg) clears AA on it. */
+  --primary: #2ee6c5;
+  --primary-hover: #5cefd6;
 }
 
 /* ----------------------------------------------------------------------------
@@ -167,9 +173,13 @@
   --color-sentiment-negative: var(--sentiment-negative);
   --color-sentiment-neutral: var(--sentiment-neutral);
 
-  /* Type roles */
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', 'Menlo', monospace;
+  /* Type roles
+     - sans: Inter (UI + body, reads cleanly at 13/14px and long prose)
+     - display: Space Grotesk (wordmark, headings, big metric values)
+     - mono: JetBrains Mono (labels, timestamps, schema keys, machine ids) */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', 'Menlo', monospace;
 
   /* Compact dashboard scale (12 / 13 / 14 base, larger display for metrics) */
   --text-xs: 0.75rem; /* 12 */
@@ -249,6 +259,23 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* Tailwind v4 Preflight resets the UA pointer cursor on controls. Restore it
+     for every interactive element (native buttons + Radix ARIA triggers). Disabled
+     buttons use pointer-events-none, so they never receive the pointer anyway. */
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='switch'],
+  summary,
+  select,
+  label:has(> input[type='checkbox']),
+  label:has(> input[type='radio']) {
+    cursor: pointer;
+  }
+
   body {
     margin: 0;
     background-color: var(--bg);
@@ -256,7 +283,8 @@
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.45;
-    font-feature-settings: 'cv11', 'ss01';
+    /* Inter: cv05 = lower-case l with tail (disambiguates l / I / 1 in data UI). */
+    font-feature-settings: 'cv05' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -310,9 +338,10 @@
   .pd-markdown h3,
   .pd-markdown h4 {
     margin: 1.1em 0 0.4em;
+    font-family: var(--font-display);
     font-weight: 600;
     line-height: 1.3;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em; /* Space Grotesk wants tighter tracking at display sizes */
     color: var(--ink);
   }
   .pd-markdown h1 {

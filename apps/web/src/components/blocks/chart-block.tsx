@@ -33,7 +33,6 @@ const SERIES_COLORS = [
   'var(--status-healthy)',
   'var(--severity-warning)',
   'var(--sentiment-negative)',
-  'var(--tint-violet-fg)',
   'var(--status-unknown)',
 ] as const;
 

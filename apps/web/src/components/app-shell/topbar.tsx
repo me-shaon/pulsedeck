@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
-import { Check, ChevronsUpDown, LogOut, Menu, Plus } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { Check, ChevronsUpDown, Menu, Plus } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ProfileMenu } from '@/components/app-shell/profile-menu';
 import { PulseLine } from '@/components/pulse-line';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +13,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { signOut } from '@/lib/auth-client';
-import { invalidateAuth } from '@/lib/guards';
-import { queryClient } from '@/lib/query-client';
 import { useCurrentWorkspace } from '@/lib/workspace-context';
 import { useWorkspaces } from '@/hooks/use-workspace-data';
 
@@ -23,16 +20,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const { workspace } = useCurrentWorkspace();
   const workspaces = useWorkspaces();
-
-  async function handleSignOut() {
-    await signOut();
-    await invalidateAuth(queryClient);
-    // Drop ALL cached data so the next user on this browser can't read the
-    // previous user's workspace data from the in-memory cache.
-    queryClient.clear();
-    toast('Signed out');
-    navigate({ to: '/login' });
-  }
 
   const initial = workspace.name.charAt(0).toUpperCase();
 
@@ -73,9 +60,6 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
           <DropdownMenuItem onSelect={() => navigate({ to: '/new-workspace' })}>
             <Plus className="size-4" /> New workspace
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleSignOut}>
-            <LogOut className="size-4" /> Sign out
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -86,8 +70,9 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         <PulseLine width={180} height={28} beats={4} speed={4.5} />
       </div>
 
-      <div className="ml-auto md:ml-0">
+      <div className="ml-auto flex items-center gap-1 md:ml-4">
         <ThemeToggle />
+        <ProfileMenu />
       </div>
     </header>
   );

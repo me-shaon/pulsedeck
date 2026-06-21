@@ -31,7 +31,7 @@ export function MetricWidget({ wsId, config }: { wsId: string; config: MetricCon
     <div className="flex flex-col gap-1">
       <Mono className="text-[0.6875rem]">{config.metricKey}</Mono>
       <div className="flex items-end gap-2">
-        <span className="tabular text-display font-semibold leading-none tracking-tight text-foreground">
+        <span className="tabular font-display text-display font-semibold leading-none tracking-tight text-foreground">
           {value}
           {suffix ? (
             <span className="ml-1 text-xl font-medium text-muted-foreground">{suffix}</span>

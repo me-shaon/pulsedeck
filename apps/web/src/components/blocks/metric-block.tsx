@@ -38,7 +38,7 @@ export function MetricBlock({ block }: { block: MetricBlockT }) {
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{block.label}</span>
         <div className="flex items-end gap-2">
-          <span className="tabular text-display font-semibold leading-none tracking-tight text-foreground">
+          <span className="tabular font-display text-display font-semibold leading-none tracking-tight text-foreground">
             {value}
             {suffix ? (
               <span className="ml-1 text-xl font-medium text-muted-foreground">{suffix}</span>

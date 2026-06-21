@@ -7,6 +7,12 @@ services:
       DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
       # Change this to a long random value (>=32 chars) before any real use.
       AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-secret-string}
+      # Public origin the browser uses to reach the app. better-auth builds OAuth
+      # callbacks + validates request origins against this, so it MUST be the
+      # public web origin (nginx, WEB_PORT) — not the API's internal port.
+      # Defaults to the local web origin; if you change WEB_PORT or front this
+      # with a domain/HTTPS, set BETTER_AUTH_URL=https://your.domain accordingly.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       # Report retention: 0 = keep forever (default). Set >0 to purge reports
       # older than N days; the sweep is single-run across replicas (advisory lock).
       RETENTION_DAYS: ${RETENTION_DAYS:-0}

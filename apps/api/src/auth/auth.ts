@@ -46,12 +46,19 @@ export function createAuth(db: Db, env: AuthEnv = {}) {
       }
     : undefined;
 
+  // Behind nginx the browser's Origin is the public web origin, which equals
+  // `BETTER_AUTH_URL`. better-auth already trusts `baseURL` by default, but we
+  // set `trustedOrigins` explicitly so the origin/CSRF check is unambiguous (and
+  // unit-testable) when the app is fronted by a reverse proxy.
+  const trustedOrigins = env.BETTER_AUTH_URL ? [env.BETTER_AUTH_URL] : undefined;
+
   return betterAuth({
     // `AUTH_SECRET` is required by `env.ts` for real boots; the placeholder only
     // applies when `createAuth` is built with no env (e.g. the DB-less health
     // unit test) so construction never throws on a missing secret.
     secret: env.AUTH_SECRET ?? 'pulsedeck-dev-insecure-secret-placeholder-0001',
     baseURL: env.BETTER_AUTH_URL,
+    ...(trustedOrigins ? { trustedOrigins } : {}),
     // Conventional better-auth mount path; the Fastify handler is registered at
     // `/api/auth/*` to match (see `src/auth/fastify.ts`).
     basePath: '/api/auth',

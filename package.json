@@ -11,7 +11,8 @@
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm --filter @pulsedeck/api dev\" \"pnpm --filter @pulsedeck/web dev\"",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter=!@pulsedeck/e2e test",
+    "test:e2e": "pnpm --filter @pulsedeck/e2e test",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",

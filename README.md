@@ -131,13 +131,44 @@ The web dev server proxies `/api` → `http://localhost:3001`, so it's same-orig
 pnpm typecheck                          # all packages
 pnpm lint                               # eslint
 pnpm build                              # build every package
-pnpm --filter @pulsedeck/api test       # API + integration tests (needs DATABASE_URL)
-pnpm --filter @pulsedeck/schema test    # schema contract tests
 
 pnpm --filter @pulsedeck/api db:generate   # generate a migration from schema changes
 pnpm --filter @pulsedeck/api db:migrate    # apply migrations
 pnpm --filter @pulsedeck/api db:studio     # Drizzle Studio
 ```
+
+---
+
+## Testing
+
+```bash
+pnpm test                               # all unit/integration tests (E2E excluded)
+pnpm --filter @pulsedeck/web test       # web: api client, route guards, auth pages
+pnpm --filter @pulsedeck/schema test    # schema contract tests
+pnpm --filter @pulsedeck/api test       # API + integration tests (needs DATABASE_URL)
+```
+
+- **Web** ([`apps/web`](./apps/web)) — Vitest + Testing Library (jsdom). Covers the
+  typed `fetch` client, the auth route guards (incl. the cache-refresh regression
+  behind the first-run flow), and the setup/login screens.
+- **API** ([`apps/api`](./apps/api)) — Vitest. Pure units run anywhere; the
+  DB-backed integration tests run only when `DATABASE_URL` is set and are skipped
+  otherwise.
+
+### End-to-end (Playwright)
+
+E2E ([`apps/e2e`](./apps/e2e)) drives the **real stack** in a browser, so the
+docker-compose stack must be running first:
+
+```bash
+docker compose up -d --build
+pnpm --filter @pulsedeck/e2e exec playwright install chromium   # first run only
+pnpm test:e2e
+```
+
+It resets the database to zero users, then walks first-run setup → workspace,
+session persistence across reload, the unauthenticated redirect, and sign-in.
+Override `WEB_URL` / `DATABASE_URL` to target a non-default port mapping.
 
 ---
 

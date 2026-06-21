@@ -31,3 +31,10 @@ npm-debug.log*
 # Test / coverage
 coverage/
 .vitest/
+
+# Playwright (E2E)
+test-results/
+playwright-report/
+.playwright/
+blob-report/
+playwright/.cache/

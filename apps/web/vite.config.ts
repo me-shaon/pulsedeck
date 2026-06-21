@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -23,5 +24,13 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    // Component/hook tests need a DOM; pure logic tests run fine here too.
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    // Exclude the Playwright E2E package — it has its own runner.
+    exclude: ['**/node_modules/**', '**/e2e/**'],
   },
 });

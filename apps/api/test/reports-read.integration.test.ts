@@ -491,6 +491,9 @@ describeIfDb('reports read APIs (integration)', () => {
     expect(cats.map((c: { slug: string }) => c.slug)).toEqual(['engineering', 'marketing']);
 
     const eng = cats[0];
+    // Created via agent autocreate → label_source is 'auto'.
+    expect(eng.labelSource).toBe('auto');
+    expect(eng.streams[0].labelSource).toBe('auto');
     expect(eng.streams.map((s: { slug: string }) => s.slug)).toEqual(['deploys', 'infra', 'page']);
     const deploys = eng.streams.find((s: { slug: string }) => s.slug === 'deploys');
     expect(deploys.reportCount).toBe(3);

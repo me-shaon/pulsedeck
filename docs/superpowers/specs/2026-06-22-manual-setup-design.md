@@ -86,11 +86,15 @@ from the name and let them override.
 ## API
 
 New routes in a new module `apps/api/src/routes/structure.ts` (registered like
-the others), with logic in a new `apps/api/src/services/structure.ts`. All
-management routes gated by the same Owner/Admin capability used for sources —
-spec target `structure:manage` (mirror `makeRequireWorkspaceRole(db,
-'sources:manage')`; confirm exact RBAC key during planning and reuse the
-sources gate if a dedicated capability is overkill).
+the others), with logic in a new `apps/api/src/services/structure.ts`. RBAC
+reuses **existing** actions (`apps/api/src/auth/rbac.ts`) — no new capability:
+
+- Category CRUD + reorder → `categories:create` (owner/admin/editor).
+- Stream CRUD + reorder → `streams:create` (owner/admin/editor).
+- **agent-instructions** endpoints → `sources:manage` (owner/admin only), since
+  they mint a registration token — same tier as source setup today.
+
+Gate via `makeRequireWorkspaceRole(db, '<action>')` exactly like `sources.ts`.
 
 ```
 POST   /api/v1/workspaces/:id/categories
@@ -220,11 +224,12 @@ Follow the existing `CreateDashboardDialog` pattern
 
 ## Permissions
 
-- All create/rename/delete/reorder/instruction routes: Owner/Admin
-  (`structure:manage`, or reuse `sources:manage` if no distinct capability is
-  warranted — decide in planning).
-- Viewers/members: read-only tree, no controls, no instruction copy (instruction
-  embeds a registration token → manage-only, same as source setup today).
+- Category/stream CRUD + reorder: `categories:create` / `streams:create`
+  (owner/admin/editor) — existing RBAC actions.
+- agent-instructions routes: `sources:manage` (owner/admin) — embeds a
+  registration token.
+- Viewers: read-only tree, no controls. Editors: CRUD/reorder but no instruction
+  copy (token-bearing → owner/admin only).
 
 ---
 

@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import type { Db } from '../db/index.js';
-import { accounts, sessions, users, verifications } from '../db/schema/index.js';
+import { authAccounts, sessions, users, verifications } from '../db/schema/index.js';
 
 /**
  * Auth-relevant slice of the validated environment. Kept as an interface (not
@@ -67,7 +67,7 @@ export function createAuth(db: Db, env: AuthEnv = {}) {
       schema: {
         user: users,
         session: sessions,
-        account: accounts,
+        account: authAccounts,
         verification: verifications,
       },
     }),

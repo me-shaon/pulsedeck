@@ -66,7 +66,7 @@ describeIfDb('retention purge (integration)', () => {
     sql = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sql);
     await runMigrations(sql);
-    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
+    await sql`TRUNCATE users, billing_accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, report_metrics, account, session, verification
       RESTART IDENTITY CASCADE`;

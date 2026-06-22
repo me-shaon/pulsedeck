@@ -40,6 +40,7 @@ describeIfDb('database schema (integration)', () => {
     `;
     const tables = new Set(rows.map((r) => r.table_name));
     for (const expected of [
+      'billing_accounts',
       'workspaces',
       'workspace_members',
       'users',
@@ -54,6 +55,36 @@ describeIfDb('database schema (integration)', () => {
     ]) {
       expect(tables.has(expected)).toBe(true);
     }
+  });
+
+  it('keeps the billing table (billing_accounts) distinct from better-auth account', async () => {
+    const rows = await sql<{ table_name: string }[]>`
+      select table_name
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name in ('billing_accounts', 'accounts', 'account')
+    `;
+    const tables = new Set(rows.map((r) => r.table_name));
+    // Billing/tenancy table is the renamed one.
+    expect(tables.has('billing_accounts')).toBe(true);
+    // The old, ambiguous name must be gone (renamed, not duplicated).
+    expect(tables.has('accounts')).toBe(false);
+    // better-auth's credential table is untouched and still present.
+    expect(tables.has('account')).toBe(true);
+  });
+
+  it('points the workspaces FK at billing_accounts', async () => {
+    const rows = await sql<{ foreign_table_name: string }[]>`
+      select ccu.table_name as foreign_table_name
+      from information_schema.table_constraints tc
+      join information_schema.constraint_column_usage ccu
+        on tc.constraint_name = ccu.constraint_name
+      where tc.constraint_type = 'FOREIGN KEY'
+        and tc.table_name = 'workspaces'
+        and tc.constraint_name = 'workspaces_account_id_billing_accounts_id_fk'
+    `;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]!.foreign_table_name).toBe('billing_accounts');
   });
 
   it('enforces the (source_id, idempotency_key) unique index on reports', async () => {

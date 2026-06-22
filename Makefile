@@ -6,7 +6,7 @@
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs build dev dev-down dev-logs ps clean
+.PHONY: help up down logs build dev dev-down dev-logs dev-fresh fresh db-reset ps clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -34,6 +34,17 @@ dev-down: ## Stop the dev stack
 
 dev-logs: ## Tail dev logs
 	$(DEV) logs -f
+
+dev-fresh: ## Wipe the dev DB volume + rebuild/start fresh (first-run setup wizard reappears)
+	$(DEV) down -v
+	$(DEV) up --build
+
+fresh: dev-fresh ## Alias for dev-fresh
+
+db-reset: ## Wipe ONLY the dev DB data (keep images/volume), then restart api so migrations re-run
+	$(DEV) up -d postgres
+	$(DEV) exec -T postgres psql -U pulsedeck -d pulsedeck -c "DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;"
+	$(DEV) restart api
 
 ## ── Misc ────────────────────────────────────────────────────────────────────
 ps: ## Show running containers

@@ -3,10 +3,10 @@ import { serverTimestamp } from './columns.js';
 
 /**
  * Billing accounts — the billing/tenancy entity that owns one or more
- * workspaces. Exported as `billingAccounts`/`BillingAccount` to stay distinct
- * from better-auth's provider `accounts`/`Account` (DB table `account`), which
- * is a different concept (a user's linked credentials). DB table name is
- * `accounts` (plural), separate from better-auth's `account` (singular).
+ * workspaces. Exported as `billingAccounts`/`BillingAccount` and stored in the
+ * DB table `billing_accounts`, kept unambiguously distinct from better-auth's
+ * provider table `account` (`authAccounts`/`AuthAccount`), which is a different
+ * concept (a user's linked credentials).
  *
  * This is the seam between the OSS substrate and the SaaS. Self-host has exactly
  * one implicit billing account (created at first-run setup) with all limits
@@ -20,7 +20,7 @@ import { serverTimestamp } from './columns.js';
  * declared here — a cloud-owned migration adds them to the same table, keeping
  * the AGPL schema free of billing concerns.
  */
-export const billingAccounts = pgTable('accounts', {
+export const billingAccounts = pgTable('billing_accounts', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   /** Max age (days) of retained reports; null = keep forever. */

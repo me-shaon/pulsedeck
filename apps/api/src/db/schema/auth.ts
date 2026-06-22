@@ -43,8 +43,13 @@ export type Session = typeof sessions.$inferSelect;
  * better-auth `account` model — one row per credential or linked OAuth account.
  * Email/password hashes live in `password` here (NOT on `users`); GitHub logins
  * store `accessToken`/`refreshToken`/`idToken` and the provider account id.
+ *
+ * Exported as `authAccounts`/`AuthAccount` (NOT `accounts`/`Account`) to stay
+ * unambiguously distinct from the billing-tenant table `billing_accounts`
+ * (`billingAccounts`/`BillingAccount`). The DB table name stays `account`
+ * (singular) to match better-auth's own generated SQL.
  */
-export const accounts = pgTable('account', {
+export const authAccounts = pgTable('account', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull(),
   providerId: text('provider_id').notNull(),
@@ -62,7 +67,7 @@ export const accounts = pgTable('account', {
   updatedAt: serverTimestamp('updated_at'),
 });
 
-export type Account = typeof accounts.$inferSelect;
+export type AuthAccount = typeof authAccounts.$inferSelect;
 
 /**
  * better-auth `verification` model — short-lived tokens for email verification

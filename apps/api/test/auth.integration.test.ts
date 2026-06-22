@@ -64,7 +64,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
     await runMigrations(sql);
 
     // Clean slate so the zero-users setup flow is deterministic.
-    await sql`TRUNCATE users, accounts, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
+    await sql`TRUNCATE users, billing_accounts, workspaces, workspace_members, invites, account, session, verification RESTART IDENTITY CASCADE`;
 
     auth = createAuth(db, AUTH_ENV);
     app = buildServer({ sql, env: AUTH_ENV, auth });

@@ -143,7 +143,7 @@ describeIfDb('dashboards + widget-data APIs (integration)', () => {
     sqlClient = postgres(DATABASE_URL!, { max: 5, onnotice: () => {} });
     db = createDrizzle(sqlClient);
     await runMigrations(sqlClient);
-    await sqlClient`TRUNCATE users, accounts, workspaces, workspace_members, invites, sources,
+    await sqlClient`TRUNCATE users, billing_accounts, workspaces, workspace_members, invites, sources,
       source_registration_tokens, source_categories, source_streams, categories,
       streams, reports, report_metrics, dashboards, account, session, verification
       RESTART IDENTITY CASCADE`;

@@ -43,6 +43,13 @@
       "when": 1782036260718,
       "tag": "0005_rename_billing_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782125534233,
+      "tag": "0006_strong_ken_ellis",
+      "breakpoints": true
     }
   ]
 }

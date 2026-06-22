@@ -465,3 +465,90 @@ RULES
 - The schema may gain optional fields over time. Fetch the latest anytime:
     GET ${baseUrl}/api/v1/schema`;
 }
+
+export type InstructionDestination =
+  | { categorySlug: string; streamSlug: string }
+  | { categorySlug: string; streamSlug?: undefined };
+
+/**
+ * Render a destination-scoped variant of {@link buildSetupPrompt}: STEP 2's body
+ * has the chosen category (and, for a stream-level destination, stream) slug
+ * pre-filled, so the operator pastes it into an agent and is done. Category-level
+ * leaves the stream choice to the agent (autocreate is on).
+ */
+export function buildDestinationSetupPrompt(
+  baseUrl: string,
+  regToken: string,
+  dest: InstructionDestination,
+): string {
+  const categoryLine = `"category": { "slug": "${dest.categorySlug}" },`;
+  const streamLine = dest.streamSlug
+    ? `"stream":   { "slug": "${dest.streamSlug}" },`
+    : `"stream":   { "slug": "<choose or create a stream under '${dest.categorySlug}'>" },`;
+  const destNote = dest.streamSlug
+    ? `Push every report to category "${dest.categorySlug}", stream "${dest.streamSlug}".`
+    : `Push reports to category "${dest.categorySlug}"; choose or create a stream slug per report.`;
+
+  return `You are integrated with PulseDeck, a reporting platform. Publish your structured
+results to it by following this protocol exactly.
+
+${destNote}
+
+BASE URL: ${baseUrl}
+
+SCHEMA VERSION: ${SCHEMA_VERSION}   # current wire-contract version
+
+────────────────────────────────────────────────────────
+STEP 1 — REGISTER (one time only)
+────────────────────────────────────────────────────────
+You have a one-time registration token (expires in 24h):
+  REGISTRATION_TOKEN: ${regToken}
+
+Call:
+  POST ${baseUrl}/api/v1/sources/register
+  Header: X-Registration-Token: ${regToken}
+  Body:   { "agent_version": "<your version>" }
+
+Response:
+  { "source_id": "src_...", "api_key": "pd_...", "schema": { ... } }
+
+Store api_key securely. The registration token is now dead — never reuse it.
+
+────────────────────────────────────────────────────────
+STEP 2 — PUBLISH A REPORT
+────────────────────────────────────────────────────────
+  POST ${baseUrl}/api/v1/reports
+  Header: Authorization: Bearer <api_key>
+  Header: Idempotency-Key: <unique id you generate per report>
+  Body:
+
+  {
+    "version": "${SCHEMA_VERSION}",
+    "source": { "id": "<source_id>" },
+    ${categoryLine}
+    ${streamLine}
+    "report": {
+      "title": "...",
+      "summary": "...",
+      "severity": "info | warning | critical",
+      "occurred_at": "<ISO 8601 UTC>",
+      "tags": ["..."]
+    },
+    "blocks": [ ... see schema; each block needs a unique "id" ... ]
+  }
+
+Reuse the SAME Idempotency-Key only when retrying the SAME report.
+
+────────────────────────────────────────────────────────
+STEP 3 — HANDLE RESPONSES
+────────────────────────────────────────────────────────
+  200/201  Success.
+  422      Validation failed. Read "issues[]", fix named fields, retry ONCE.
+  401      API key invalid/revoked. Stop; ask the operator to re-register.
+  403      Not allowed to write there. Stop, tell the operator.
+  409      Unknown slug with autocreate disabled. Stop; do not invent slugs.
+  429      Rate limited. Back off exponentially, then retry.
+  5xx      Server error. Back off and retry; the Idempotency-Key makes it safe.
+
+Full wire schema anytime: GET ${baseUrl}/api/v1/schema`;
+}

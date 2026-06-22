@@ -13,6 +13,7 @@ import { healthRoutes } from './routes/health.js';
 import { reportReadRoutes } from './routes/reports-read.js';
 import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
+import { structureRoutes } from './routes/structure.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { createRetentionRunner, type RetentionRunner } from './retention/index.js';
 import { createConsoleEmailPort, type EmailPort } from './services/email.js';
@@ -172,6 +173,7 @@ export function buildServer({
   app.register(authRoutes);
   app.register(workspaceRoutes);
   app.register(sourceRoutes);
+  app.register(structureRoutes);
   app.register(reportRoutes);
   app.register(reportReadRoutes);
   app.register(dashboardRoutes);

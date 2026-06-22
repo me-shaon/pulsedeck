@@ -42,3 +42,12 @@ export function canManage(role: Role | undefined): boolean {
 export function canBuildDashboards(role: Role | undefined): boolean {
   return role === 'owner' || role === 'admin' || role === 'editor';
 }
+
+/**
+ * Whether the current role may manage categories/streams (`categories:create` /
+ * `streams:create` → Owner/Admin/Editor). Copying agent instructions is gated
+ * separately by {@link canManage} since it mints a registration token.
+ */
+export function canManageStructure(role: Role | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'editor';
+}

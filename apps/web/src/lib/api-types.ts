@@ -189,10 +189,13 @@ export interface ReportDetailResponse {
   nextReportId: string | null;
 }
 
+export type LabelSource = 'auto' | 'user';
+
 export interface TreeStream {
   id: string;
   slug: string;
   name: string;
+  labelSource: LabelSource;
   position: number;
   reportCount: number;
   lastReportAt: string | null;
@@ -202,12 +205,21 @@ export interface TreeCategory {
   id: string;
   slug: string;
   name: string;
+  labelSource: LabelSource;
   position: number;
   streams: TreeStream[];
 }
 
 export interface Tree {
   categories: TreeCategory[];
+}
+
+/** Response of the destination-scoped agent-instructions endpoints. */
+export interface AgentInstructions {
+  registrationToken: string;
+  setupPrompt: string;
+  schema: unknown;
+  baseUrlNote?: string;
 }
 
 // --- Dashboards & widgets (Phase 9) -------------------------------------

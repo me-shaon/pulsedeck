@@ -15,6 +15,11 @@ export const categories = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
+    // 'auto' = name derived from slug at autocreate; 'user' = operator set it.
+    // Operator-set names are never overwritten by later agent pushes.
+    labelSource: text('label_source', { enum: ['auto', 'user'] })
+      .notNull()
+      .default('auto'),
     position: integer('position').notNull().default(0),
   },
   (t) => [uniqueIndex('categories_workspace_slug_uq').on(t.workspaceId, t.slug)],

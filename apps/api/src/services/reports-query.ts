@@ -470,6 +470,7 @@ export interface TreeStream {
   id: string;
   slug: string;
   name: string;
+  labelSource: 'auto' | 'user';
   position: number;
   reportCount: number;
   lastReportAt: string | null;
@@ -480,6 +481,7 @@ export interface TreeCategory {
   id: string;
   slug: string;
   name: string;
+  labelSource: 'auto' | 'user';
   position: number;
   streams: TreeStream[];
 }
@@ -500,6 +502,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
       id: categories.id,
       slug: categories.slug,
       name: categories.name,
+      labelSource: categories.labelSource,
       position: categories.position,
     })
     .from(categories)
@@ -511,6 +514,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
       id: streams.id,
       slug: streams.slug,
       name: streams.name,
+      labelSource: streams.labelSource,
       position: streams.position,
       categoryId: streams.categoryId,
       reportCount: sql<number>`count(${reports.id})::int`,
@@ -528,6 +532,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
     id: string;
     slug: string;
     name: string;
+    labelSource: 'auto' | 'user';
     position: number;
     categoryId: string;
     reportCount: number;
@@ -541,6 +546,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
       id: s.id,
       slug: s.slug,
       name: s.name,
+      labelSource: s.labelSource,
       position: s.position,
       reportCount: s.reportCount,
       lastReportAt: s.lastReportAt ? new Date(s.lastReportAt).toISOString() : null,
@@ -552,6 +558,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
     id: c.id,
     slug: c.slug,
     name: c.name,
+    labelSource: c.labelSource,
     position: c.position,
     streams: byCategory.get(c.id) ?? [],
   }));

@@ -116,7 +116,7 @@ async function createCategory(tx: Tx, workspaceId: string, slug: string): Promis
   // win the unique (workspace_id, slug) race; we then read whichever row exists.
   await tx
     .insert(categories)
-    .values({ id: id('cat'), workspaceId, name: titleFromSlug(slug), slug })
+    .values({ id: id('cat'), workspaceId, name: titleFromSlug(slug), slug, labelSource: 'auto' })
     .onConflictDoNothing({ target: [categories.workspaceId, categories.slug] });
   const row = await resolveCategory(tx, workspaceId, slug);
   return row!;
@@ -138,7 +138,7 @@ async function resolveStream(
 async function createStream(tx: Tx, categoryId: string, slug: string): Promise<Stream> {
   await tx
     .insert(streams)
-    .values({ id: id('stm'), categoryId, name: titleFromSlug(slug), slug })
+    .values({ id: id('stm'), categoryId, name: titleFromSlug(slug), slug, labelSource: 'auto' })
     .onConflictDoNothing({ target: [streams.categoryId, streams.slug] });
   const row = await resolveStream(tx, categoryId, slug);
   return row!;

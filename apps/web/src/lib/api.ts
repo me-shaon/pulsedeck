@@ -1,5 +1,6 @@
 import type {
   Account,
+  AgentInstructions,
   AlertItem,
   AuthConfig,
   CountBucket,
@@ -23,6 +24,8 @@ import type {
   Source,
   SourceScope,
   Tree,
+  TreeCategory,
+  TreeStream,
   WidgetRange,
   Workspace,
   WorkspaceListItem,
@@ -245,6 +248,64 @@ export const getReport = (wsId: string, reportId: string, signal?: AbortSignal) 
 
 export const getTree = (wsId: string, signal?: AbortSignal) =>
   request<Tree>(`/workspaces/${wsId}/tree`, { signal });
+
+// --- Structure (manual category/stream management) -----------------------
+
+export const createCategory = (wsId: string, input: { name: string; slug?: string }) =>
+  request<{ category: TreeCategory }>(`/workspaces/${wsId}/categories`, {
+    method: 'POST',
+    body: input,
+  });
+
+export const renameCategory = (wsId: string, categoryId: string, name: string) =>
+  request<{ category: TreeCategory }>(`/workspaces/${wsId}/categories/${categoryId}`, {
+    method: 'PATCH',
+    body: { name },
+  });
+
+export const deleteCategory = (wsId: string, categoryId: string) =>
+  request<void>(`/workspaces/${wsId}/categories/${categoryId}`, { method: 'DELETE' });
+
+export const reorderCategories = (wsId: string, ids: string[]) =>
+  request<{ ok: true }>(`/workspaces/${wsId}/categories/reorder`, {
+    method: 'PATCH',
+    body: { ids },
+  });
+
+export const createStream = (
+  wsId: string,
+  categoryId: string,
+  input: { name: string; slug?: string },
+) =>
+  request<{ stream: TreeStream }>(`/workspaces/${wsId}/categories/${categoryId}/streams`, {
+    method: 'POST',
+    body: input,
+  });
+
+export const renameStream = (wsId: string, streamId: string, name: string) =>
+  request<{ stream: TreeStream }>(`/workspaces/${wsId}/streams/${streamId}`, {
+    method: 'PATCH',
+    body: { name },
+  });
+
+export const deleteStream = (wsId: string, streamId: string) =>
+  request<void>(`/workspaces/${wsId}/streams/${streamId}`, { method: 'DELETE' });
+
+export const reorderStreams = (wsId: string, categoryId: string, ids: string[]) =>
+  request<{ ok: true }>(`/workspaces/${wsId}/categories/${categoryId}/streams/reorder`, {
+    method: 'PATCH',
+    body: { ids },
+  });
+
+export const getStreamInstructions = (wsId: string, streamId: string, sourceId: string) =>
+  request<AgentInstructions>(`/workspaces/${wsId}/streams/${streamId}/agent-instructions`, {
+    query: { sourceId },
+  });
+
+export const getCategoryInstructions = (wsId: string, categoryId: string, sourceId: string) =>
+  request<AgentInstructions>(`/workspaces/${wsId}/categories/${categoryId}/agent-instructions`, {
+    query: { sourceId },
+  });
 
 // --- Dashboards ----------------------------------------------------------
 

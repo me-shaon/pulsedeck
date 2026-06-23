@@ -51,7 +51,7 @@ export function WidgetShell({
 }: WidgetShellProps) {
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+      <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pt-3 pb-2">
         <CardTitle className="flex min-w-0 items-center gap-2">
           <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="truncate">{title}</span>

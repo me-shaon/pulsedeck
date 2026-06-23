@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import {
   Dialog,
@@ -27,7 +27,12 @@ import type { AgentInstructions } from '@/lib/api-types';
  * will push), then a paste-ready prompt is generated with the target
  * category/stream slug pre-filled and a fresh one-time registration token. The
  * operator pastes it into their agent (Claude Code, Cursor, …) and is done.
+ *
+ * Visual language mirrors {@link SecretRevealDialog}: a labelled field, a code
+ * block with an inline copy affordance, and a single primary footer action.
  */
+const fieldLabel = 'text-xs font-medium text-muted-foreground';
+
 export function AgentInstructionsDialog({
   open,
   onOpenChange,
@@ -59,11 +64,7 @@ export function AgentInstructionsDialog({
     if (!sourceId || !target) return;
     setError(null);
     try {
-      const res = await instructions.mutateAsync({
-        kind: target.kind,
-        id: target.id,
-        sourceId,
-      });
+      const res = await instructions.mutateAsync({ kind: target.kind, id: target.id, sourceId });
       setResult(res);
     } catch (e) {
       setError(e);
@@ -90,7 +91,7 @@ export function AgentInstructionsDialog({
             <Link
               to="/w/$ws/sources"
               params={{ ws: wsSlug }}
-              className="text-brand underline"
+              className="font-medium text-brand underline-offset-2 hover:underline"
               onClick={() => onOpenChange(false)}
             >
               Sources
@@ -98,35 +99,35 @@ export function AgentInstructionsDialog({
             page, then come back to copy instructions.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Source (agent)</span>
-              <div className="flex items-center gap-2">
-                <Select value={sourceId} onValueChange={setSourceId}>
-                  <SelectTrigger className="flex-1" aria-label="Source">
-                    <SelectValue placeholder="Choose a source…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sources.data?.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="primary"
-                  onClick={generate}
-                  disabled={!sourceId || instructions.isPending}
-                >
-                  {instructions.isPending ? 'Generating…' : result ? 'Regenerate' : 'Generate'}
-                </Button>
-              </div>
+              <span className={fieldLabel}>Source (agent)</span>
+              <Select value={sourceId} onValueChange={setSourceId}>
+                <SelectTrigger aria-label="Source">
+                  <SelectValue placeholder="Choose a source…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sources.data?.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {error ? <p className="text-xs text-destructive">{errorMessage(error)}</p> : null}
 
-            {result ? (
+            {!result ? (
+              <Button
+                variant="primary"
+                className="w-full"
+                onClick={generate}
+                disabled={!sourceId || instructions.isPending}
+              >
+                {instructions.isPending ? 'Generating…' : 'Generate instructions'}
+              </Button>
+            ) : (
               <>
                 {result.baseUrlNote ? (
                   <div className="flex items-start gap-2 rounded-md border border-[var(--severity-warning)]/40 bg-[var(--tint-amber-bg)] px-3 py-2 text-xs">
@@ -137,6 +138,7 @@ export function AgentInstructionsDialog({
                     <span className="text-foreground">{result.baseUrlNote}</span>
                   </div>
                 ) : null}
+
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
@@ -147,19 +149,29 @@ export function AgentInstructionsDialog({
                   <pre className="mono max-h-72 overflow-auto rounded-md border border-border bg-surface-2 p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap">
                     {result.setupPrompt}
                   </pre>
-                  <p className="text-[0.6875rem] text-muted-foreground">
-                    Contains a one-time registration token — it expires in 24h. Regenerate if it
-                    lapses.
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[0.6875rem] text-muted-foreground">
+                      Contains a one-time registration token — expires in 24h.
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={generate}
+                      disabled={instructions.isPending}
+                    >
+                      <RotateCw className="size-3.5" />
+                      {instructions.isPending ? 'Regenerating…' : 'Regenerate'}
+                    </Button>
+                  </div>
                 </div>
               </>
-            ) : null}
+            )}
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Close
+          <Button variant={result ? 'primary' : 'ghost'} onClick={() => onOpenChange(false)}>
+            {result ? 'Done' : 'Close'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -26,6 +26,7 @@ import {
   SecretRevealDialog,
   type SecretRevealData,
 } from '@/components/sources/secret-reveal-dialog';
+import { WebhooksCard } from '@/components/webhooks/webhooks-card';
 
 const ROLES: Role[] = ['owner', 'admin', 'editor', 'viewer'];
 
@@ -42,6 +43,7 @@ export function SettingsPage() {
       <div className="flex flex-col gap-6">
         <MembersCard wsId={workspace.id} manage={manage} />
         {manage ? <InvitesCard wsId={workspace.id} /> : null}
+        {manage ? <WebhooksCard wsId={workspace.id} /> : null}
       </div>
     </PageContainer>
   );

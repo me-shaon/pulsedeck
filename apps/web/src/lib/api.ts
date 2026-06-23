@@ -29,7 +29,12 @@ import type {
   WidgetRange,
   Workspace,
   WorkspaceListItem,
+  Webhook,
+  CreatedWebhook,
+  WebhookFormat,
+  DeliveryPage,
 } from './api-types';
+import type { Severity } from '@pulsedeck/schema';
 
 /**
  * Typed API client. A thin `fetch` wrapper that:
@@ -200,6 +205,61 @@ export const rotateKey = (wsId: string, sourceId: string) =>
 
 export const revokeSource = (wsId: string, sourceId: string) =>
   request<void>(`/workspaces/${wsId}/sources/${sourceId}/revoke`, { method: 'POST' });
+
+// --- Webhooks ------------------------------------------------------------
+
+export interface WebhookInput {
+  name: string;
+  url: string;
+  format: WebhookFormat;
+  severities: Severity[];
+  categoryIds: string[];
+  enabled: boolean;
+}
+
+export const listWebhooks = (wsId: string, signal?: AbortSignal) =>
+  request<{ webhooks: Webhook[] }>(`/workspaces/${wsId}/webhooks`, { signal });
+
+export const createWebhook = (wsId: string, input: WebhookInput) =>
+  request<{ webhook: CreatedWebhook }>(`/workspaces/${wsId}/webhooks`, {
+    method: 'POST',
+    body: input,
+  });
+
+export const updateWebhook = (wsId: string, whId: string, patch: Partial<WebhookInput>) =>
+  request<{ webhook: Webhook }>(`/workspaces/${wsId}/webhooks/${whId}`, {
+    method: 'PATCH',
+    body: patch,
+  });
+
+export const rotateWebhookSecret = (wsId: string, whId: string) =>
+  request<{ secret: string }>(`/workspaces/${wsId}/webhooks/${whId}/rotate-secret`, {
+    method: 'POST',
+  });
+
+export const deleteWebhook = (wsId: string, whId: string) =>
+  request<void>(`/workspaces/${wsId}/webhooks/${whId}`, { method: 'DELETE' });
+
+export const testWebhook = (wsId: string, whId: string) =>
+  request<{ deliveryId: string }>(`/workspaces/${wsId}/webhooks/${whId}/test`, { method: 'POST' });
+
+export const listWebhookDeliveries = (
+  wsId: string,
+  whId: string,
+  cursor?: string,
+  limit = 20,
+  signal?: AbortSignal,
+) =>
+  request<DeliveryPage>(`/workspaces/${wsId}/webhooks/${whId}/deliveries`, {
+    query: { limit, cursor },
+    signal,
+  });
+
+export const redeliverWebhook = (wsId: string, whId: string, deliveryId: string) =>
+  request<{ deliveryId: string }>(
+    `/workspaces/${wsId}/webhooks/${whId}/deliveries/${deliveryId}/redeliver`,
+    { method: 'POST' },
+  );
 
 // --- Reports / tree ------------------------------------------------------
 

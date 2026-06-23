@@ -22,6 +22,8 @@ export const ID_PREFIXES = {
   reportMetric: 'mtr',
   invite: 'inv',
   registrationToken: 'regtok',
+  webhook: 'wh',
+  webhookDelivery: 'whd',
 } as const;
 
 /** Union of every valid id prefix (`'ws' | 'usr' | ...`). */

@@ -55,6 +55,9 @@ export const queryKeys = {
   members: (wsId: string) => ['members', wsId] as const,
   invites: (wsId: string) => ['invites', wsId] as const,
   sources: (wsId: string) => ['sources', wsId] as const,
+  webhooks: (wsId: string) => ['webhooks', wsId] as const,
+  webhookDeliveries: (wsId: string, webhookId: string) =>
+    ['webhooks', wsId, webhookId, 'deliveries'] as const,
   report: (wsId: string, reportId: string) => ['report', wsId, reportId] as const,
   reports: (wsId: string, scope: unknown) => ['reports', wsId, scope] as const,
   // Dashboards (Phase 9)

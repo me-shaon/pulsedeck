@@ -1,6 +1,6 @@
-import { and, countDistinct, eq } from 'drizzle-orm';
+import { and, countDistinct, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/index.js';
-import { billingAccounts, workspaceMembers, workspaces } from '../db/index.js';
+import { billingAccounts, webhooks, workspaceMembers, workspaces } from '../db/index.js';
 
 /**
  * Account limit enforcement — the single seam between a plan's quotas and the
@@ -14,10 +14,11 @@ export interface AccountLimits {
   retentionDays: number | null;
   maxSeats: number | null;
   maxWorkspaces: number | null;
+  maxWebhooks: number | null;
 }
 
 /** Which quota was hit — lets the web map the error to the right upsell. */
-export type LimitKind = 'seats' | 'workspaces';
+export type LimitKind = 'seats' | 'workspaces' | 'webhooks';
 
 /**
  * Raised when an account action would exceed its plan. Carries `statusCode` 402
@@ -42,6 +43,7 @@ export async function getAccountLimits(db: Db, accountId: string): Promise<Accou
       retentionDays: billingAccounts.retentionDays,
       maxSeats: billingAccounts.maxSeats,
       maxWorkspaces: billingAccounts.maxWorkspaces,
+      maxWebhooks: billingAccounts.maxWebhooks,
     })
     .from(billingAccounts)
     .where(eq(billingAccounts.id, accountId))
@@ -50,6 +52,7 @@ export async function getAccountLimits(db: Db, accountId: string): Promise<Accou
     retentionDays: row?.retentionDays ?? null,
     maxSeats: row?.maxSeats ?? null,
     maxWorkspaces: row?.maxWorkspaces ?? null,
+    maxWebhooks: row?.maxWebhooks ?? null,
   };
 }
 
@@ -101,6 +104,48 @@ export async function assertCanAddSeat(
     throw new LimitExceededError(
       'seats',
       `Seat limit reached (${maxSeats}). Upgrade your plan to add more members.`,
+    );
+  }
+}
+
+/** The owning account id for a workspace, or null if the workspace is unknown. */
+export async function accountIdForWorkspace(db: Db, workspaceId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ accountId: workspaces.accountId })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  return row?.accountId ?? null;
+}
+
+/** Number of webhooks across all of an account's workspaces. */
+export async function countWebhooks(db: Db, accountId: string): Promise<number> {
+  const wsRows = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.accountId, accountId));
+  const ids = wsRows.map((r) => r.id);
+  if (ids.length === 0) return 0;
+  const [row] = await db
+    .select({ value: countDistinct(webhooks.id) })
+    .from(webhooks)
+    .where(inArray(webhooks.workspaceId, ids));
+  return Number(row?.value ?? 0);
+}
+
+/**
+ * Throw {@link LimitExceededError} if adding a webhook to `workspaceId` would
+ * exceed the owning account's plan. `null` limit (the OSS default) is a no-op.
+ */
+export async function assertCanAddWebhook(db: Db, workspaceId: string): Promise<void> {
+  const accountId = await accountIdForWorkspace(db, workspaceId);
+  if (!accountId) return; // unknown workspace — the route's RBAC gate handles existence
+  const { maxWebhooks } = await getAccountLimits(db, accountId);
+  if (maxWebhooks == null) return; // unlimited
+  if ((await countWebhooks(db, accountId)) >= maxWebhooks) {
+    throw new LimitExceededError(
+      'webhooks',
+      `Webhook limit reached (${maxWebhooks}). Upgrade your plan to add more.`,
     );
   }
 }

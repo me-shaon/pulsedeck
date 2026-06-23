@@ -18,4 +18,5 @@ export * from './source-registration-tokens.js';
 export * from './reports.js';
 export * from './report-metrics.js';
 export * from './dashboards.js';
+export * from './webhooks.js';
 export * from './relations.js';

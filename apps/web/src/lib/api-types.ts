@@ -368,3 +368,47 @@ export interface ReportFilters {
   from?: string;
   to?: string;
 }
+
+// --- Webhooks ------------------------------------------------------------
+
+export type WebhookFormat = 'generic' | 'slack' | 'discord' | 'mattermost';
+export type WebhookDeliveryStatus = 'pending' | 'delivering' | 'success' | 'failed';
+
+/** A configured outbound webhook (secret omitted by the read endpoints). */
+export interface Webhook {
+  id: string;
+  workspaceId: string;
+  name: string;
+  url: string;
+  format: WebhookFormat;
+  severities: Severity[];
+  categoryIds: string[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/rotate responses include the one-time signing secret. */
+export interface CreatedWebhook extends Webhook {
+  secret: string;
+}
+
+/** One row in a webhook's delivery log. */
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  reportId: string | null;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  lastStatusCode: number | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
+export interface DeliveryPage {
+  items: WebhookDelivery[];
+  nextCursor: string | null;
+}

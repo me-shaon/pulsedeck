@@ -14,9 +14,16 @@ import { reportReadRoutes } from './routes/reports-read.js';
 import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
 import { structureRoutes } from './routes/structure.js';
+import { webhookRoutes } from './routes/webhooks.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { createRetentionRunner, type RetentionRunner } from './retention/index.js';
 import { createConsoleEmailPort, type EmailPort } from './services/email.js';
+import {
+  createEnqueuer,
+  createWebhookRunner,
+  type Enqueuer,
+  type WebhookRunner,
+} from './webhooks/index.js';
 
 // Shared singletons are decorated onto the app so every route/plugin reads them
 // off `app` instead of re-threading them through registration options.
@@ -33,6 +40,10 @@ declare module 'fastify' {
     email: EmailPort;
     /** Retention sweep runner; `start()`ed in index.ts, status read by /healthz. */
     retention: RetentionRunner;
+    /** Ingestion→webhook fan-out; routes call `invalidate()` on webhook CRUD. */
+    webhookEnqueuer: Enqueuer;
+    /** Webhook delivery poller; `start()`ed in index.ts. */
+    webhookRunner: WebhookRunner;
   }
 }
 
@@ -65,6 +76,9 @@ export interface BuildServerOptions {
   /** Pre-built retention runner; defaults to `createRetentionRunner(...)`.
    * Injectable so tests can supply a fake. NOT auto-started by buildServer. */
   retention?: RetentionRunner;
+  /** Pre-built webhook delivery runner; defaults to `createWebhookRunner(...)`.
+   * Injectable so tests can supply a fake. NOT auto-started by buildServer. */
+  webhookRunner?: WebhookRunner;
 }
 
 /**
@@ -86,6 +100,7 @@ export function buildServer({
   retentionDays = 0,
   retentionSweepIntervalMs = 3_600_000,
   retention,
+  webhookRunner,
 }: BuildServerOptions): FastifyInstance {
   const app = Fastify({ logger });
 
@@ -151,6 +166,42 @@ export function buildServer({
     retentionInstance.stop();
   });
 
+  // Outbound webhooks (PRD "Webhooks"). The enqueuer subscribes to the ingestion
+  // bus and persists a delivery row per matching report (no HTTP); the runner
+  // (created here, started in index.ts) claims and POSTs them. The bus
+  // subscription is torn down on close so repeated buildServer() calls in tests
+  // don't accumulate listeners on the singleton bus.
+  const enqueuer = createEnqueuer({
+    db: dbInstance,
+    maxAttempts: runtime.webhook.maxAttempts,
+    appBaseUrl: env.BETTER_AUTH_URL,
+    logger: { warn: (o, m) => app.log.warn(o, m) },
+  });
+  app.decorate('webhookEnqueuer', enqueuer);
+  const unsubWebhooks = ingestionBus.onReportIngested(enqueuer.onReportIngested);
+  app.addHook('onClose', async () => {
+    unsubWebhooks();
+  });
+
+  const webhookRunnerInstance =
+    webhookRunner ??
+    createWebhookRunner({
+      db: dbInstance,
+      pollIntervalMs: runtime.webhook.pollIntervalMs,
+      batchSize: runtime.webhook.batchSize,
+      deliveryTimeoutMs: runtime.webhook.deliveryTimeoutMs,
+      allowPrivateIps: runtime.webhook.allowPrivateIps,
+      logger: {
+        info: (o, m) => app.log.info(o, m),
+        warn: (o, m) => app.log.warn(o, m),
+        error: (o, m) => app.log.error(o, m),
+      },
+    });
+  app.decorate('webhookRunner', webhookRunnerInstance);
+  app.addHook('onClose', async () => {
+    webhookRunnerInstance.stop();
+  });
+
   // Default request decorations the auth preHandlers populate.
   app.decorateRequest('user', null);
   app.decorateRequest('workspaceRole', null);
@@ -178,6 +229,7 @@ export function buildServer({
   app.register(reportReadRoutes);
   app.register(dashboardRoutes);
   app.register(eventRoutes);
+  app.register(webhookRoutes);
 
   return app;
 }

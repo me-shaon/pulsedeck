@@ -49,6 +49,24 @@ export interface RuntimeConfig {
     /** From address used by a configured provider. */
     from?: string;
   };
+  /** Outbound webhook delivery config (env `WEBHOOK_*`). */
+  webhook: {
+    /** How often the delivery runner claims due rows (ms). */
+    pollIntervalMs: number;
+    /** Per-delivery retry ceiling. */
+    maxAttempts: number;
+    /** Outbound POST timeout (ms). */
+    deliveryTimeoutMs: number;
+    /** Rows claimed per poll. */
+    batchSize: number;
+    /**
+     * Whether webhook URLs may resolve to loopback/private/link-local ranges.
+     * Mode-derived: allowed self-host (internal Slack/services are a valid
+     * target), blocked on cloud (URLs are untrusted multi-tenant input → SSRF
+     * defense). Overridable via `WEBHOOK_ALLOW_PRIVATE_IPS`.
+     */
+    allowPrivateIps: boolean;
+  };
 }
 
 /**
@@ -65,6 +83,11 @@ export type RuntimeConfigEnv = Partial<
     | 'INGEST_RATE_WINDOW'
     | 'EMAIL_PROVIDER'
     | 'EMAIL_FROM'
+    | 'WEBHOOK_POLL_INTERVAL_MS'
+    | 'WEBHOOK_MAX_ATTEMPTS'
+    | 'WEBHOOK_DELIVERY_TIMEOUT_MS'
+    | 'WEBHOOK_BATCH_SIZE'
+    | 'WEBHOOK_ALLOW_PRIVATE_IPS'
   >
 >;
 
@@ -101,6 +124,13 @@ export function buildRuntimeConfig(env: RuntimeConfigEnv): RuntimeConfig {
     email: {
       provider: env.EMAIL_PROVIDER,
       from: env.EMAIL_FROM,
+    },
+    webhook: {
+      pollIntervalMs: env.WEBHOOK_POLL_INTERVAL_MS ?? 2000,
+      maxAttempts: env.WEBHOOK_MAX_ATTEMPTS ?? 5,
+      deliveryTimeoutMs: env.WEBHOOK_DELIVERY_TIMEOUT_MS ?? 10_000,
+      batchSize: env.WEBHOOK_BATCH_SIZE ?? 20,
+      allowPrivateIps: env.WEBHOOK_ALLOW_PRIVATE_IPS ?? !isCloud,
     },
   };
 }

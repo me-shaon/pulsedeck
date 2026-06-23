@@ -50,6 +50,13 @@
       "when": 1782125534233,
       "tag": "0006_strong_ken_ellis",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782207688482,
+      "tag": "0007_fuzzy_fallen_one",
+      "breakpoints": true
     }
   ]
 }

@@ -49,6 +49,10 @@ async function main(): Promise<void> {
   // is unref()'d, so it never blocks the graceful shutdown below.
   app.retention.start();
 
+  // Arm the webhook delivery poller. Its timer is unref()'d and claims rows with
+  // SKIP LOCKED, so it's safe across replicas and never blocks shutdown.
+  app.webhookRunner.start();
+
   // Close the server and drain the connection pool on container stop so
   // redeploys don't drop in-flight requests or leak connections.
   const shutdown = async (signal: string): Promise<void> => {

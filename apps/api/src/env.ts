@@ -66,6 +66,24 @@ const EnvSchema = z.object({
   // response. The cloud package binds a real provider keyed off these.
   EMAIL_PROVIDER: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+
+  // Outbound webhook delivery (PRD "Webhooks"). The runner polls the durable
+  // `webhook_deliveries` queue and POSTs matching reports to external URLs.
+  //   WEBHOOK_POLL_INTERVAL_MS   — how often the runner claims due rows (default 2s).
+  //   WEBHOOK_MAX_ATTEMPTS       — per-delivery retry ceiling (default 5).
+  //   WEBHOOK_DELIVERY_TIMEOUT_MS— outbound POST timeout (default 10s).
+  //   WEBHOOK_BATCH_SIZE         — rows claimed per poll (default 20).
+  WEBHOOK_POLL_INTERVAL_MS: z.coerce.number().int().min(250).default(2000),
+  WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(5),
+  WEBHOOK_DELIVERY_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10_000),
+  WEBHOOK_BATCH_SIZE: z.coerce.number().int().min(1).default(20),
+  // SSRF policy. Default derived from DEPLOYMENT_MODE (allowed self-host so a
+  // deploy can hit internal Slack/services; blocked on cloud where URLs are
+  // untrusted multi-tenant input). Accepts false/0/no/off (falsy) or truthy.
+  WEBHOOK_ALLOW_PRIVATE_IPS: z
+    .string()
+    .optional()
+    .transform((v) => (v == null ? undefined : !/^(false|0|no|off)$/i.test(v.trim()))),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

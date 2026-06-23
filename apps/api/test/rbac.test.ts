@@ -18,6 +18,7 @@ const EXPECTED: Record<Action, Role[]> = {
   'categories:create': ['owner', 'admin', 'editor'],
   'streams:create': ['owner', 'admin', 'editor'],
   'dashboards:build': ['owner', 'admin', 'editor'],
+  'webhooks:manage': ['owner', 'admin'],
   'reports:view': ['owner', 'admin', 'editor', 'viewer'],
 };
 

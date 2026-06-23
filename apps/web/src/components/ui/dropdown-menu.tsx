@@ -15,7 +15,7 @@ const menuContentClasses =
   'data-[state=open]:animate-content-in data-[state=closed]:animate-content-out';
 
 const menuItemClasses =
-  'relative flex cursor-default select-none items-center gap-2 rounded-[4px] px-2 py-1.5 text-sm outline-none transition-colors ' +
+  'relative flex cursor-pointer select-none items-center gap-2 rounded-[4px] px-2 py-1.5 text-sm outline-none transition-colors ' +
   'focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0';
 
 const DropdownMenuContent = React.forwardRef<

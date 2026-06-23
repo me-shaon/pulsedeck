@@ -29,6 +29,8 @@ export const billingAccounts = pgTable('billing_accounts', {
   maxSeats: integer('max_seats'),
   /** Max workspaces under this account; null = unlimited. */
   maxWorkspaces: integer('max_workspaces'),
+  /** Max outbound webhooks across the account's workspaces; null = unlimited. */
+  maxWebhooks: integer('max_webhooks'),
   createdAt: serverTimestamp('created_at'),
 });
 

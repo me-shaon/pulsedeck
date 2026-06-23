@@ -14,6 +14,7 @@
  *   | Manage sources              |   ✓   |   ✓   |   —    |   —    |
  *   | Create categories/streams   |   ✓   |   ✓   |   ✓    |   —    |
  *   | Build dashboards            |   ✓   |   ✓   |   ✓    |   —    |
+ *   | Manage webhooks             |   ✓   |   ✓   |   —    |   —    |
  *   | View reports                |   ✓   |   ✓   |   ✓    |   ✓    |
  */
 
@@ -28,6 +29,7 @@ export type Action =
   | 'categories:create'
   | 'streams:create'
   | 'dashboards:build'
+  | 'webhooks:manage'
   | 'reports:view';
 
 /**
@@ -42,6 +44,7 @@ const POLICY: Record<Action, readonly Role[]> = {
   'categories:create': ['owner', 'admin', 'editor'],
   'streams:create': ['owner', 'admin', 'editor'],
   'dashboards:build': ['owner', 'admin', 'editor'],
+  'webhooks:manage': ['owner', 'admin'],
   'reports:view': ['owner', 'admin', 'editor', 'viewer'],
 };
 

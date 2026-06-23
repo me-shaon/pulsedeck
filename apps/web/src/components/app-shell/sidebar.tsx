@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  ChevronRight,
   GripVertical,
   Hash,
   LayoutDashboard,
@@ -446,6 +447,8 @@ function CategoryGroup({
   onReorderCategories: (orderedIds: string[]) => void;
   onReorderStreams: (categoryId: string, orderedIds: string[]) => void;
 }) {
+  const [open, setOpen] = useState(true);
+
   function handleCategoryDrop(draggedId: string) {
     if (draggedId === category.id) return;
     const ids = allCategoryIds.filter((id) => id !== draggedId);
@@ -476,16 +479,30 @@ function CategoryGroup({
         }
       }}
     >
-      <div className="group/cat flex items-center gap-1 px-2.5 py-1">
+      <div className="group/cat flex items-center gap-0.5 rounded-md px-1 py-1 hover:bg-accent/50">
         {canStructure ? (
           <GripVertical
             className="size-3 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover/cat:opacity-100"
             aria-hidden
           />
         ) : null}
-        <span className="flex-1 truncate text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground/80">
-          {category.name}
-        </span>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronRight
+            className={cn(
+              'size-3.5 shrink-0 text-muted-foreground/60 transition-transform',
+              open && 'rotate-90',
+            )}
+            aria-hidden
+          />
+          <span className="truncate text-xs font-semibold uppercase tracking-wide text-foreground/70">
+            {category.name}
+          </span>
+        </button>
         {canStructure ? (
           <>
             <button
@@ -508,62 +525,69 @@ function CategoryGroup({
         ) : null}
       </div>
 
-      {category.streams.map((stream) => (
-        <div
-          key={stream.id}
-          className="group/stream flex items-center"
-          draggable={canStructure}
-          onDragStart={(e) => {
-            if (!canStructure) return;
-            e.stopPropagation();
-            e.dataTransfer.setData('application/x-pd-stream', stream.id);
-            e.dataTransfer.effectAllowed = 'move';
-          }}
-          onDragOver={(e) => {
-            if (canStructure && e.dataTransfer.types.includes('application/x-pd-stream')) {
-              e.preventDefault();
-            }
-          }}
-          onDrop={(e) => {
-            const draggedId = e.dataTransfer.getData('application/x-pd-stream');
-            if (!draggedId || draggedId === stream.id) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const streamIds = category.streams.map((s) => s.id);
-            if (!streamIds.includes(draggedId)) return;
-            const ids = streamIds.filter((id) => id !== draggedId);
-            const at = ids.indexOf(stream.id);
-            ids.splice(at, 0, draggedId);
-            onReorderStreams(category.id, ids);
-          }}
-        >
-          <Link
-            to="/w/$ws/stream/$streamId"
-            params={{ ws, streamId: stream.id }}
-            onClick={onNavigate}
-            data-ring="self"
-            className={cn(streamBase, 'min-w-0 flex-1')}
-            activeProps={linkActive}
-            inactiveProps={linkInactive}
-            title={`${category.name} / ${stream.name}`}
-          >
-            <Hash className="size-3.5 shrink-0 opacity-60" />
-            <span className="flex-1 truncate text-left">{stream.name}</span>
-            <span className="tabular-nums text-[0.6875rem] text-muted-foreground">
-              {stream.reportCount}
-            </span>
-          </Link>
-          {canStructure ? (
-            <RowMenu
-              label={`${stream.name} options`}
-              canCopyInstructions={canCopyInstructions}
-              onCopyInstructions={() => onCopyStreamInstructions(stream)}
-              onRename={() => onRenameStream(stream)}
-              onDelete={() => onDeleteStream(stream)}
-            />
+      {open ? (
+        <div className="ml-[0.5625rem] flex flex-col gap-0.5 border-l border-border/70 pl-1.5">
+          {category.streams.length === 0 ? (
+            <p className="px-2 py-1 text-xs text-muted-foreground/60">No streams yet</p>
           ) : null}
+          {category.streams.map((stream) => (
+            <div
+              key={stream.id}
+              className="group/stream flex items-center"
+              draggable={canStructure}
+              onDragStart={(e) => {
+                if (!canStructure) return;
+                e.stopPropagation();
+                e.dataTransfer.setData('application/x-pd-stream', stream.id);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(e) => {
+                if (canStructure && e.dataTransfer.types.includes('application/x-pd-stream')) {
+                  e.preventDefault();
+                }
+              }}
+              onDrop={(e) => {
+                const draggedId = e.dataTransfer.getData('application/x-pd-stream');
+                if (!draggedId || draggedId === stream.id) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const streamIds = category.streams.map((s) => s.id);
+                if (!streamIds.includes(draggedId)) return;
+                const ids = streamIds.filter((id) => id !== draggedId);
+                const at = ids.indexOf(stream.id);
+                ids.splice(at, 0, draggedId);
+                onReorderStreams(category.id, ids);
+              }}
+            >
+              <Link
+                to="/w/$ws/stream/$streamId"
+                params={{ ws, streamId: stream.id }}
+                onClick={onNavigate}
+                data-ring="self"
+                className={cn(streamBase, 'min-w-0 flex-1')}
+                activeProps={linkActive}
+                inactiveProps={linkInactive}
+                title={`${category.name} / ${stream.name}`}
+              >
+                <Hash className="size-3.5 shrink-0 opacity-60" />
+                <span className="flex-1 truncate text-left">{stream.name}</span>
+                <span className="tabular-nums text-[0.6875rem] text-muted-foreground">
+                  {stream.reportCount}
+                </span>
+              </Link>
+              {canStructure ? (
+                <RowMenu
+                  label={`${stream.name} options`}
+                  canCopyInstructions={canCopyInstructions}
+                  onCopyInstructions={() => onCopyStreamInstructions(stream)}
+                  onRename={() => onRenameStream(stream)}
+                  onDelete={() => onDeleteStream(stream)}
+                />
+              ) : null}
+            </div>
+          ))}
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }

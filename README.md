@@ -60,6 +60,142 @@ Charts, streams, and the live feed start populating right away.
 > **Port already taken?** Override it inline, e.g. `WEB_PORT=8080 docker compose up`.
 > Defaults: web `3000`, api `3001`, postgres `5432`.
 
+### Run without Docker
+
+<details>
+<summary>Manual setup for local development and production (no Docker required)</summary>
+
+PulseDeck is a standard pnpm monorepo. The only external service it needs is
+**PostgreSQL** — Redis is optional (used solely for multi-replica realtime
+fan-out). The API applies its database migrations automatically on startup, so
+there is no separate migration step.
+
+#### Prerequisites
+
+- **Node.js 22+**
+- **pnpm 9.15+** — `corepack enable && corepack prepare pnpm@9.15.0 --activate`
+- **PostgreSQL 16+** — running and reachable
+
+#### 1. Install dependencies
+
+```bash
+git clone <repo-url> pulsedeck && cd pulsedeck
+pnpm install --frozen-lockfile
+```
+
+#### 2. Create the database
+
+```bash
+psql -U postgres -c "CREATE USER pulsedeck WITH PASSWORD 'pulsedeck';"
+psql -U postgres -c "CREATE DATABASE pulsedeck OWNER pulsedeck;"
+# Postgres 15+ locks down the public schema — grant it explicitly:
+psql -U postgres -d pulsedeck -c "GRANT ALL ON SCHEMA public TO pulsedeck;"
+```
+
+#### 3. Configure the API
+
+The API reads its config from `apps/api/.env` (real environment variables always
+win). Create it with at least the two required values:
+
+```bash
+cat > apps/api/.env <<'EOF'
+DATABASE_URL=postgres://pulsedeck:pulsedeck@localhost:5432/pulsedeck
+AUTH_SECRET=replace-with-32+-random-chars   # e.g. `openssl rand -base64 48`
+EOF
+```
+
+All other options (retention, OAuth, signup mode, …) are documented in
+[`.env.example`](./.env.example).
+
+#### 4a. Local development (hot reload)
+
+```bash
+pnpm dev
+```
+
+This starts the API on **:3001** and the web dev server on **:3000** (Vite
+proxies `/api` → the API, keeping cookies first-party). Migrations run on API
+start. Open **http://localhost:3000**.
+
+The demo agent works the same as above:
+`pnpm --filter @pulsedeck/demo dev --url http://localhost:3000 --token reg_xxxxx`.
+
+#### 4b. Production
+
+**Build everything:**
+
+```bash
+pnpm build
+```
+
+This emits the API bundle to `apps/api/dist` and the static web bundle to
+`apps/web/dist`.
+
+**Start the API** (it applies pending migrations, then listens):
+
+```bash
+cd apps/api
+NODE_ENV=production \
+DATABASE_URL=postgres://pulsedeck:pulsedeck@localhost:5432/pulsedeck \
+AUTH_SECRET=your-32+-char-secret \
+BETTER_AUTH_URL=https://your.domain \
+PORT=3001 \
+node dist/index.js
+```
+
+Keep it alive with a process manager (systemd, pm2, …). `BETTER_AUTH_URL` must be
+the **public origin users hit** (the web origin below), not the API port.
+
+**Serve the web bundle.** `apps/web/dist` is static files. The SPA calls `/api`
+on its own origin, so put a reverse proxy in front that serves the static files
+**and** forwards `/api` to the API. Example nginx (mirrors the bundled
+[`apps/web/nginx.conf`](./apps/web/nginx.conf)):
+
+```nginx
+server {
+  listen 80;
+  server_name your.domain;
+  root /path/to/pulsedeck/apps/web/dist;
+  index index.html;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:3001;        # keeps the /api prefix
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    # Server-Sent Events (live updates): flush immediately, don't time out.
+    proxy_set_header Connection '';
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;        # SPA client-side routing
+  }
+}
+```
+
+Caddy alternative (`Caddyfile`):
+
+```caddyfile
+your.domain {
+  root * /path/to/pulsedeck/apps/web/dist
+  handle /api/* {
+    reverse_proxy 127.0.0.1:3001
+  }
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
+}
+```
+
+Put TLS in front (Caddy does this automatically; for nginx use certbot) and set
+`BETTER_AUTH_URL=https://your.domain` to match.
+
+</details>
+
 ---
 
 ## What you get

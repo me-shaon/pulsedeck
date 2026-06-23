@@ -605,18 +605,27 @@ function RowMenu({
           <MoreHorizontal className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem onSelect={onRename}>
-          <Pencil className="size-3.5" /> Rename
+      <DropdownMenuContent align="end" className="min-w-max">
+        <DropdownMenuItem
+          onSelect={onRename}
+          className="whitespace-nowrap text-xs text-muted-foreground focus:text-foreground"
+        >
+          <Pencil className="size-3.5 shrink-0" /> Rename
         </DropdownMenuItem>
         {canCopyInstructions ? (
-          <DropdownMenuItem onSelect={onCopyInstructions}>
-            <Terminal className="size-3.5" /> Copy agent instructions
+          <DropdownMenuItem
+            onSelect={onCopyInstructions}
+            className="whitespace-nowrap text-xs text-muted-foreground focus:text-foreground"
+          >
+            <Terminal className="size-3.5 shrink-0" /> Copy agent instructions
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive">
-          <Trash2 className="size-3.5" /> Delete
+        <DropdownMenuItem
+          onSelect={onDelete}
+          className="whitespace-nowrap text-xs text-destructive/80 focus:text-destructive"
+        >
+          <Trash2 className="size-3.5 shrink-0" /> Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -12,7 +12,6 @@ import {
   Radio,
   Search,
   Settings,
-  Sparkles,
   Star,
   Terminal,
   Trash2,
@@ -487,12 +486,6 @@ function CategoryGroup({
         <span className="flex-1 truncate text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground/80">
           {category.name}
         </span>
-        {category.labelSource === 'auto' ? (
-          <Sparkles
-            className="size-3 shrink-0 text-muted-foreground/40"
-            aria-label="Auto-named — rename to customize"
-          />
-        ) : null}
         {canStructure ? (
           <>
             <button
@@ -556,12 +549,6 @@ function CategoryGroup({
           >
             <Hash className="size-3.5 shrink-0 opacity-60" />
             <span className="flex-1 truncate text-left">{stream.name}</span>
-            {stream.labelSource === 'auto' ? (
-              <Sparkles
-                className="size-3 shrink-0 text-muted-foreground/40"
-                aria-label="Auto-named — rename to customize"
-              />
-            ) : null}
             <span className="tabular-nums text-[0.6875rem] text-muted-foreground">
               {stream.reportCount}
             </span>

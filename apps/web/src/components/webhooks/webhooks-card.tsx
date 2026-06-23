@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Activity,
   MoreHorizontal,
@@ -13,19 +14,18 @@ import {
   Webhook as WebhookIcon,
 } from 'lucide-react';
 import type { Severity } from '@pulsedeck/schema';
-import type { Webhook, WebhookDeliveryStatus, WebhookFormat } from '@/lib/api-types';
+import type { Webhook, WebhookFormat } from '@/lib/api-types';
 import {
   createWebhook,
   deleteWebhook,
-  listWebhookDeliveries,
   listWebhooks,
-  redeliverWebhook,
   rotateWebhookSecret,
   testWebhook,
   updateWebhook,
   type WebhookInput,
 } from '@/lib/api';
 import { queryClient, queryKeys } from '@/lib/query-client';
+import { useCurrentWorkspace } from '@/lib/workspace-context';
 import { useTree } from '@/hooks/use-workspace-data';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,6 @@ import { Mono } from '@/components/ui/mono';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, SkeletonRows, errorMessage } from '@/components/common/states';
-import { RelativeTime } from '@/components/common/relative-time';
 import { toast } from '@/components/ui/sonner';
 import {
   Dialog,
@@ -75,13 +74,6 @@ const FORMATS: { value: WebhookFormat; label: string }[] = [
   { value: 'mattermost', label: 'Mattermost' },
 ];
 
-const STATUS_VARIANT: Record<WebhookDeliveryStatus, 'healthy' | 'critical' | 'neutral' | 'info'> = {
-  success: 'healthy',
-  failed: 'critical',
-  pending: 'neutral',
-  delivering: 'info',
-};
-
 function hostOf(url: string): string {
   try {
     return new URL(url).host;
@@ -96,6 +88,8 @@ function hostOf(url: string): string {
  * delivery-log dialog. The signing secret is revealed once (generic only).
  */
 export function WebhooksCard({ wsId }: { wsId: string }) {
+  const { workspace } = useCurrentWorkspace();
+  const navigate = useNavigate();
   const webhooks = useQuery({
     queryKey: queryKeys.webhooks(wsId),
     queryFn: ({ signal }) => listWebhooks(wsId, signal),
@@ -109,7 +103,12 @@ export function WebhooksCard({ wsId }: { wsId: string }) {
   >(null);
   const [secret, setSecret] = useState<SecretRevealData | null>(null);
   const [confirm, setConfirm] = useState<Webhook | null>(null);
-  const [logFor, setLogFor] = useState<Webhook | null>(null);
+
+  const openLog = (w: Webhook) =>
+    navigate({
+      to: '/w/$ws/settings/webhooks/$webhookId/deliveries',
+      params: { ws: workspace.slug, webhookId: w.id },
+    });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.webhooks(wsId) });
 
@@ -211,7 +210,7 @@ export function WebhooksCard({ wsId }: { wsId: string }) {
                     <DropdownMenuItem onSelect={() => setDialog({ mode: 'edit', webhook: w })}>
                       <Pencil className="size-4" /> Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setLogFor(w)}>
+                    <DropdownMenuItem onSelect={() => openLog(w)}>
                       <Activity className="size-4" /> Delivery log
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -261,10 +260,6 @@ export function WebhooksCard({ wsId }: { wsId: string }) {
       ) : null}
 
       <SecretRevealDialog data={secret} onClose={() => setSecret(null)} />
-
-      {logFor ? (
-        <DeliveryLogDialog wsId={wsId} webhook={logFor} onClose={() => setLogFor(null)} />
-      ) : null}
 
       <ConfirmDialog
         open={confirm !== null}
@@ -455,84 +450,6 @@ function WebhookDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DeliveryLogDialog({
-  wsId,
-  webhook,
-  onClose,
-}: {
-  wsId: string;
-  webhook: Webhook;
-  onClose: () => void;
-}) {
-  const deliveries = useQuery({
-    queryKey: queryKeys.webhookDeliveries(wsId, webhook.id),
-    queryFn: ({ signal }) => listWebhookDeliveries(wsId, webhook.id, undefined, 20, signal),
-  });
-
-  const redeliver = useMutation({
-    mutationFn: (deliveryId: string) => redeliverWebhook(wsId, webhook.id, deliveryId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.webhookDeliveries(wsId, webhook.id),
-      });
-      toast('Re-queued for delivery');
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-
-  return (
-    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Delivery log — {webhook.name}</DialogTitle>
-          <DialogDescription>Recent delivery attempts, newest first.</DialogDescription>
-        </DialogHeader>
-        {deliveries.isPending ? (
-          <SkeletonRows rows={4} />
-        ) : deliveries.isError ? (
-          <ErrorState error={deliveries.error} onRetry={() => deliveries.refetch()} />
-        ) : deliveries.data.items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No deliveries yet.</p>
-        ) : (
-          <div className="flex max-h-96 flex-col divide-y divide-border overflow-auto">
-            {deliveries.data.items.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 py-2.5 first:pt-0">
-                <Badge variant={STATUS_VARIANT[d.status]} className="shrink-0 capitalize">
-                  {d.status}
-                </Badge>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-xs">
-                    {d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : (d.lastError ?? '—')}
-                    {d.attempts > 1 ? ` · ${d.attempts} attempts` : ''}
-                  </span>
-                  <span className="text-[0.6875rem] text-muted-foreground">
-                    <RelativeTime value={d.deliveredAt ?? d.createdAt} />
-                  </span>
-                </div>
-                {d.status === 'success' || d.status === 'failed' ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => redeliver.mutate(d.id)}
-                    disabled={redeliver.isPending}
-                  >
-                    <RefreshCw className="size-3.5" /> Redeliver
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="primary" onClick={onClose}>
-            Done
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

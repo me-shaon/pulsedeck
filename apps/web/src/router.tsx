@@ -24,7 +24,8 @@ import { StreamPage } from '@/pages/stream';
 import { ReportDetailPage } from '@/pages/report-detail';
 import { SearchPage } from '@/pages/search';
 import { SourcesPage } from '@/pages/sources';
-import { SettingsPage } from '@/pages/settings';
+import { SettingsLayout, MembersSettingsPage } from '@/pages/settings';
+import { WebhooksSettingsPage, WebhookDeliveriesPage } from '@/pages/settings-webhooks';
 import { AccountPage } from '@/pages/account';
 import type { Role, Workspace } from '@/lib/api-types';
 
@@ -210,7 +211,25 @@ const sourcesRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => workspaceRoute,
   path: 'settings',
-  component: SettingsPage,
+  component: SettingsLayout,
+});
+
+const settingsMembersRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/',
+  component: MembersSettingsPage,
+});
+
+const settingsWebhooksRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'webhooks',
+  component: WebhooksSettingsPage,
+});
+
+const settingsWebhookDeliveriesRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'webhooks/$webhookId/deliveries',
+  component: WebhookDeliveriesPage,
 });
 
 const accountRoute = createRoute({
@@ -234,7 +253,11 @@ const routeTree = rootRoute.addChildren([
     streamRoute,
     reportDetailRoute,
     sourcesRoute,
-    settingsRoute,
+    settingsRoute.addChildren([
+      settingsMembersRoute,
+      settingsWebhooksRoute,
+      settingsWebhookDeliveriesRoute,
+    ]),
     accountRoute,
   ]),
 ]);

@@ -56,6 +56,7 @@ export const queryKeys = {
   invites: (wsId: string) => ['invites', wsId] as const,
   sources: (wsId: string) => ['sources', wsId] as const,
   webhooks: (wsId: string) => ['webhooks', wsId] as const,
+  webhook: (wsId: string, webhookId: string) => ['webhook', wsId, webhookId] as const,
   webhookDeliveries: (wsId: string, webhookId: string) =>
     ['webhooks', wsId, webhookId, 'deliveries'] as const,
   report: (wsId: string, reportId: string) => ['report', wsId, reportId] as const,

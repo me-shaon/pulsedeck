@@ -220,6 +220,9 @@ export interface WebhookInput {
 export const listWebhooks = (wsId: string, signal?: AbortSignal) =>
   request<{ webhooks: Webhook[] }>(`/workspaces/${wsId}/webhooks`, { signal });
 
+export const getWebhook = (wsId: string, whId: string, signal?: AbortSignal) =>
+  request<{ webhook: Webhook }>(`/workspaces/${wsId}/webhooks/${whId}`, { signal });
+
 export const createWebhook = (wsId: string, input: WebhookInput) =>
   request<{ webhook: CreatedWebhook }>(`/workspaces/${wsId}/webhooks`, {
     method: 'POST',

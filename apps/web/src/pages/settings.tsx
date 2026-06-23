@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Mail, Trash2, UserPlus } from 'lucide-react';
+import { Link, Outlet } from '@tanstack/react-router';
+import { Mail, Trash2, UserPlus, Users, Webhook as WebhookIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/api-types';
 import { createInvite, listInvites, listMembers, removeMember, updateMemberRole } from '@/lib/api';
 import { ApiError } from '@/lib/api';
@@ -26,26 +28,59 @@ import {
   SecretRevealDialog,
   type SecretRevealData,
 } from '@/components/sources/secret-reveal-dialog';
-import { WebhooksCard } from '@/components/webhooks/webhooks-card';
 
 const ROLES: Role[] = ['owner', 'admin', 'editor', 'viewer'];
 
-export function SettingsPage() {
-  const { workspace, role } = useCurrentWorkspace();
-  const manage = canManage(role);
+interface SettingsTab {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  exact?: boolean;
+}
 
+const TABS: SettingsTab[] = [
+  { to: '/w/$ws/settings', label: 'Members', icon: Users, exact: true },
+  { to: '/w/$ws/settings/webhooks', label: 'Webhooks', icon: WebhookIcon },
+];
+
+/** Settings shell: a left tab rail + the active section rendered via Outlet. */
+export function SettingsLayout() {
+  const { workspace } = useCurrentWorkspace();
   return (
     <PageContainer>
-      <PageHeader
-        title="Settings"
-        description={`Manage members and invites for ${workspace.name}.`}
-      />
-      <div className="flex flex-col gap-6">
-        <MembersCard wsId={workspace.id} manage={manage} />
-        {manage ? <InvitesCard wsId={workspace.id} /> : null}
-        {manage ? <WebhooksCard wsId={workspace.id} /> : null}
+      <PageHeader title="Settings" description={`Manage ${workspace.name}.`} />
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto lg:w-48 lg:flex-col lg:overflow-visible">
+          {TABS.map((t) => (
+            <Link
+              key={t.to}
+              to={t.to}
+              params={{ ws: workspace.slug }}
+              activeOptions={{ exact: t.exact }}
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+              activeProps={{ className: 'bg-brand-tint font-medium text-foreground' }}
+            >
+              <t.icon className="size-4" /> {t.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="min-w-0 flex-1">
+          <Outlet />
+        </div>
       </div>
     </PageContainer>
+  );
+}
+
+/** Members tab: roster + invite links. */
+export function MembersSettingsPage() {
+  const { workspace, role } = useCurrentWorkspace();
+  const manage = canManage(role);
+  return (
+    <div className="flex flex-col gap-6">
+      <MembersCard wsId={workspace.id} manage={manage} />
+      {manage ? <InvitesCard wsId={workspace.id} /> : null}
+    </div>
   );
 }
 

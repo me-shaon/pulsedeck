@@ -1,5 +1,17 @@
 import type { Severity } from '@pulsedeck/schema';
-import { and, arrayOverlaps, asc, desc, eq, gte, lte, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  arrayOverlaps,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { Db } from '../db/index.js';
 import { categories, reports, sources, streams } from '../db/index.js';
 
@@ -42,7 +54,8 @@ export interface ListParams {
   /** Stream slug-or-id filter, resolved within the workspace. */
   stream: string | null;
   source: string | null;
-  severity: Severity | null;
+  /** Severity filter — ANY semantics: a report matching any listed severity. */
+  severities: Severity[];
   /** Tag filter — ANY semantics (array overlap): a report matching any tag. */
   tags: string[];
   from: Date | null;
@@ -141,14 +154,14 @@ export function parseListQuery(query: Record<string, unknown>): ParseResult {
     if (!cursor) return { ok: false, message: 'malformed cursor' };
   }
 
-  // severity — must be one of the canonical enum values.
-  let severity: Severity | null = null;
-  const sevRaw = single(query.severity);
-  if (sevRaw !== undefined) {
-    if (!SEVERITIES.includes(sevRaw as Severity)) {
+  // severity — repeated and/or comma-joined; each must be a canonical enum
+  // value. ANY semantics downstream (warning,critical → both).
+  const severities: Severity[] = [];
+  for (const part of collectTags(query.severity)) {
+    if (!SEVERITIES.includes(part as Severity)) {
       return { ok: false, message: `severity must be one of ${SEVERITIES.join(', ')}` };
     }
-    severity = sevRaw as Severity;
+    if (!severities.includes(part as Severity)) severities.push(part as Severity);
   }
 
   // from / to — ISO-8601; invalid → 400.
@@ -166,7 +179,7 @@ export function parseListQuery(query: Record<string, unknown>): ParseResult {
       category: single(query.category) ?? null,
       stream: single(query.stream) ?? null,
       source: single(query.source) ?? null,
-      severity,
+      severities,
       tags: collectTags(query.tags),
       from,
       to,
@@ -284,7 +297,7 @@ function listConditions(workspaceId: string, streamId: string | undefined, p: Li
     conditions.push(or(eq(streams.id, p.stream), eq(streams.slug, p.stream)) as SQL);
   }
   if (p.source) conditions.push(eq(reports.sourceId, p.source));
-  if (p.severity) conditions.push(eq(reports.severity, p.severity));
+  if (p.severities.length > 0) conditions.push(inArray(reports.severity, p.severities));
   if (p.tags.length > 0) conditions.push(arrayOverlaps(reports.tags, p.tags));
   if (p.from) conditions.push(gte(reports.receivedAt, p.from));
   if (p.to) conditions.push(lte(reports.receivedAt, p.to));

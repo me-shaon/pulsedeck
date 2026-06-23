@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import type { Severity } from '@pulsedeck/schema';
 import type { ReportFilters, Source, Tree } from '@/lib/api-types';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,7 +73,7 @@ export function ReportFiltersBar({
 
   const hasActive = Boolean(
     filters.q ||
-    filters.severity ||
+    (filters.severity && filters.severity.length > 0) ||
     filters.source ||
     filters.category ||
     filters.stream ||
@@ -95,36 +96,57 @@ export function ReportFiltersBar({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search reports…"
-          aria-label="Search reports"
-          className="pl-8"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search reports…"
+            aria-label="Search reports"
+            className="pl-8"
+          />
+        </div>
+        {hasActive ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange({})}
+            className="shrink-0 text-muted-foreground"
+          >
+            <X className="size-3.5" /> Clear
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
         <FilterField label="Severity">
-          <Select
-            value={filters.severity ?? ALL}
-            onValueChange={(v) => set('severity', v === ALL ? undefined : (v as Severity))}
-          >
-            <SelectTrigger className="w-36" aria-label="Filter by severity">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All severities</SelectItem>
-              {SEVERITIES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1" role="group" aria-label="Filter by severity">
+            {SEVERITIES.map((s) => {
+              const active = (filters.severity ?? []).includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    const cur = filters.severity ?? [];
+                    const next = active ? cur.filter((x) => x !== s) : [...cur, s];
+                    set('severity', next.length ? next : undefined);
+                  }}
+                  className={cn(
+                    'flex h-8 items-center rounded-md border px-2.5 text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    active
+                      ? 'border-brand bg-brand-tint text-brand'
+                      : 'border-border text-muted-foreground hover:border-border-strong hover:text-foreground',
+                  )}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
         </FilterField>
 
         {sources && sources.length > 0 ? (
@@ -230,17 +252,6 @@ export function ReportFiltersBar({
             className="w-40"
           />
         </FilterField>
-
-        {hasActive ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onChange({})}
-            className="text-muted-foreground"
-          >
-            <X className="size-3.5" /> Clear
-          </Button>
-        ) : null}
       </div>
     </div>
   );

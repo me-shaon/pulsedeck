@@ -65,16 +65,16 @@ describe('request building', () => {
 
     await listReports(
       'ws_1',
-      { tags: ['db', 'auth'], severity: 'critical', q: '', category: 'sys' },
+      { tags: ['db', 'auth'], severity: ['warning', 'critical'], q: '', category: 'sys' },
       undefined,
       25,
     );
 
     const [url] = fetchMock.mock.calls[0];
     const qs = new URL(url, 'http://x').searchParams;
-    // Array filter is comma-joined into a single param.
+    // Array filters are comma-joined into a single param.
     expect(qs.get('tags')).toBe('db,auth');
-    expect(qs.get('severity')).toBe('critical');
+    expect(qs.get('severity')).toBe('warning,critical');
     expect(qs.get('category')).toBe('sys');
     expect(qs.get('limit')).toBe('25');
     // Empty string `q` and undefined cursor must be omitted entirely.

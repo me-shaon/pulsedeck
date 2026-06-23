@@ -370,6 +370,14 @@ describeIfDb('reports read APIs (integration)', () => {
     expect(res.json().reports.map((r: { id: string }) => r.id)).toEqual([r3]);
   });
 
+  it('severity filter accepts a comma list (ANY semantics, newest-first)', async () => {
+    const res = await get(
+      `/api/v1/workspaces/${workspaceId}/streams/${stDeploys}/reports?severity=warning,critical`,
+    );
+    // r2=warning, r3=critical; r1=info excluded. Ordered newest → oldest.
+    expect(res.json().reports.map((r: { id: string }) => r.id)).toEqual([r3, r2]);
+  });
+
   it('tag filter uses ANY (array overlap) semantics', async () => {
     const res = await get(
       `/api/v1/workspaces/${workspaceId}/streams/${stDeploys}/reports?tags=prod`,

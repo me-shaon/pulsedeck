@@ -211,7 +211,7 @@ function filterQuery(filters: ReportFilters, limit?: number, cursor?: string) {
     category: filters.category,
     stream: filters.stream,
     source: filters.source,
-    severity: filters.severity,
+    severity: filters.severity && filters.severity.length ? filters.severity.join(',') : undefined,
     tags: filters.tags,
     from: filters.from,
     to: filters.to,

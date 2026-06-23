@@ -363,7 +363,7 @@ export interface ReportFilters {
   category?: string;
   stream?: string;
   source?: string;
-  severity?: Severity;
+  severity?: Severity[];
   tags?: string[];
   from?: string;
   to?: string;

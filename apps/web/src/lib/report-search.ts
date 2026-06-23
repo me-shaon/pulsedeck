@@ -9,7 +9,8 @@ import type { ReportFilters } from './api-types';
  */
 export interface ReportSearch {
   q?: string;
-  severity?: Severity;
+  /** Comma-joined severities in the URL (e.g. `warning,critical`); ANY semantics. */
+  severity?: string;
   source?: string;
   category?: string;
   stream?: string;
@@ -24,13 +25,25 @@ function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/** Explode a comma/repeated raw value into a clean, deduped severity list. */
+function parseSeverities(raw: unknown): Severity[] {
+  const parts = (Array.isArray(raw) ? raw : [raw])
+    .filter((v): v is string => typeof v === 'string')
+    .flatMap((v) => v.split(','))
+    .map((s) => s.trim());
+  const out: Severity[] = [];
+  for (const p of parts) {
+    if (SEVERITIES.includes(p as Severity) && !out.includes(p as Severity)) out.push(p as Severity);
+  }
+  return out;
+}
+
 /** Router `validateSearch`: coerces raw params into a typed, clean shape. */
 export function validateReportSearch(raw: Record<string, unknown>): ReportSearch {
-  const severity = str(raw.severity);
+  const severities = parseSeverities(raw.severity);
   return {
     q: str(raw.q),
-    severity:
-      severity && SEVERITIES.includes(severity as Severity) ? (severity as Severity) : undefined,
+    severity: severities.length ? severities.join(',') : undefined,
     source: str(raw.source),
     category: str(raw.category),
     stream: str(raw.stream),
@@ -44,7 +57,7 @@ export function validateReportSearch(raw: Record<string, unknown>): ReportSearch
 export function searchToFilters(search: ReportSearch): ReportFilters {
   return {
     q: search.q,
-    severity: search.severity,
+    severity: search.severity ? parseSeverities(search.severity) : undefined,
     source: search.source,
     category: search.category,
     stream: search.stream,
@@ -63,7 +76,7 @@ export function searchToFilters(search: ReportSearch): ReportFilters {
 export function filtersToSearch(filters: ReportFilters): ReportSearch {
   return {
     q: filters.q || undefined,
-    severity: filters.severity,
+    severity: filters.severity && filters.severity.length ? filters.severity.join(',') : undefined,
     source: filters.source || undefined,
     category: filters.category || undefined,
     stream: filters.stream || undefined,

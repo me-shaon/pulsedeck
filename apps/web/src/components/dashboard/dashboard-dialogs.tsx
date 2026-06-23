@@ -11,15 +11,76 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/components/common/states';
+import { cn } from '@/lib/utils';
 
 /**
  * Create / rename dialogs for dashboards. Both take a `name` (required) and an
  * optional `icon` string, run the async mutation, surface an inline error, and
- * close on success. The icon is a short free-text token (e.g. an emoji) — the
- * sidebar renders it verbatim when present.
+ * close on success. The icon is a short token (an emoji) — the sidebar renders
+ * it verbatim when present; the picker below just curates which emoji is stored.
  */
 
 const fieldLabel = 'text-xs font-medium text-muted-foreground';
+
+/** Curated emoji set for dashboard icons — covers the common ops/biz/eng themes. */
+const DASHBOARD_ICONS = [
+  '📊',
+  '📈',
+  '📉',
+  '📋',
+  '🗂️',
+  '🧭',
+  '🎯',
+  '🚀',
+  '⚙️',
+  '🔧',
+  '🛠️',
+  '🚨',
+  '🔔',
+  '🛡️',
+  '🔍',
+  '🧪',
+  '💰',
+  '🛒',
+  '💡',
+  '🌐',
+  '📦',
+  '🩺',
+  '🔥',
+  '⭐',
+];
+
+/**
+ * Click-to-pick emoji grid for the dashboard icon. Stores the chosen emoji as a
+ * plain string (so existing string icons keep working); clicking the active one
+ * clears it back to none, keeping the field optional.
+ */
+function IconPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  return (
+    <div className="grid grid-cols-8 gap-1" role="group" aria-label="Dashboard icon">
+      {DASHBOARD_ICONS.map((emoji) => {
+        const active = value === emoji;
+        return (
+          <button
+            key={emoji}
+            type="button"
+            aria-pressed={active}
+            aria-label={active ? `Icon ${emoji}, selected` : `Icon ${emoji}`}
+            onClick={() => onChange(active ? '' : emoji)}
+            className={cn(
+              'flex aspect-square items-center justify-center rounded-md border text-lg leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              active
+                ? 'border-brand bg-brand-tint'
+                : 'border-border hover:border-border-strong hover:bg-surface-2/50',
+            )}
+          >
+            {emoji}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function CreateDashboardDialog({
   open,
@@ -81,13 +142,7 @@ export function CreateDashboardDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <span className={fieldLabel}>Icon (optional)</span>
-            <Input
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="e.g. 📊"
-              aria-label="Dashboard icon"
-              className="w-24"
-            />
+            <IconPicker value={icon} onChange={setIcon} />
           </div>
           {error ? <p className="text-xs text-destructive">{errorMessage(error)}</p> : null}
         </div>
@@ -162,13 +217,7 @@ export function RenameDashboardDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <span className={fieldLabel}>Icon (optional)</span>
-            <Input
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="e.g. 📊"
-              aria-label="Dashboard icon"
-              className="w-24"
-            />
+            <IconPicker value={icon} onChange={setIcon} />
           </div>
           {error ? <p className="text-xs text-destructive">{errorMessage(error)}</p> : null}
         </div>

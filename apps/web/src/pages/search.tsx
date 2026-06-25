@@ -1,6 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { searchToFilters, filtersToSearch } from '@/lib/report-search';
-import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReportsInfinite } from '@/hooks/use-reports';
 import { useSources, useTree } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
@@ -14,7 +14,7 @@ const route = getRouteApi('/w/$ws/search');
  * surface. Full-text `q` plus the full filter set, all in the URL.
  */
 export function SearchPage() {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   const navigate = route.useNavigate();
   const search = route.useSearch();
   const filters = searchToFilters(search);
@@ -39,6 +39,9 @@ export function SearchPage() {
       </div>
       <ReportList
         ws={workspace.slug}
+        wsId={workspace.id}
+        canManage={canManageReports(role)}
+        scope={filters.archived ?? 'active'}
         query={query}
         emptyTitle="No matching reports"
         emptyDescription="Try a different search term or relax the filters."

@@ -1,6 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { searchToFilters, filtersToSearch } from '@/lib/report-search';
-import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReportsInfinite } from '@/hooks/use-reports';
 import { useSources, useTree } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
@@ -11,7 +11,7 @@ const route = getRouteApi('/w/$ws/reports');
 
 /** Workspace-wide "All Reports" feed with search + filters reflected in the URL. */
 export function ReportsPage() {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   const navigate = route.useNavigate();
   const search = route.useSearch();
   const filters = searchToFilters(search);
@@ -34,7 +34,13 @@ export function ReportsPage() {
           tree={tree.data}
         />
       </div>
-      <ReportList ws={workspace.slug} query={query} />
+      <ReportList
+        ws={workspace.slug}
+        wsId={workspace.id}
+        canManage={canManageReports(role)}
+        scope={filters.archived ?? 'active'}
+        query={query}
+      />
     </PageContainer>
   );
 }

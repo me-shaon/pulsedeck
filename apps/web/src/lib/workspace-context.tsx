@@ -51,3 +51,12 @@ export function canBuildDashboards(role: Role | undefined): boolean {
 export function canManageStructure(role: Role | undefined): boolean {
   return role === 'owner' || role === 'admin' || role === 'editor';
 }
+
+/**
+ * Whether the current role may archive/unarchive/hard-delete reports
+ * (`reports:manage` → Owner/Admin/Editor; Viewer is read-only). The API enforces
+ * this too — this hides the bulk controls so a Viewer never sees a 403 action.
+ */
+export function canManageReports(role: Role | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'editor';
+}

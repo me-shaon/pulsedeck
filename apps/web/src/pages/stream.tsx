@@ -1,6 +1,6 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { searchToFilters, filtersToSearch } from '@/lib/report-search';
-import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReportsInfinite } from '@/hooks/use-reports';
 import { useSources, useTree } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
@@ -11,7 +11,7 @@ const route = getRouteApi('/w/$ws/stream/$streamId');
 
 /** Per-stream feed — the same shared list, scoped to one stream. */
 export function StreamPage() {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   const { streamId } = route.useParams();
   const navigate = route.useNavigate();
   const search = route.useSearch();
@@ -46,6 +46,9 @@ export function StreamPage() {
       </div>
       <ReportList
         ws={workspace.slug}
+        wsId={workspace.id}
+        canManage={canManageReports(role)}
+        scope={filters.archived ?? 'active'}
         query={query}
         emptyTitle="No reports in this stream"
         emptyDescription="Reports pushed to this stream will appear here."

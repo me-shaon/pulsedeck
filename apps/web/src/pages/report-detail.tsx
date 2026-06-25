@@ -1,8 +1,9 @@
 import { getRouteApi } from '@tanstack/react-router';
-import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReport } from '@/hooks/use-workspace-data';
 import { BlockList } from '@/components/blocks/registry';
 import { PrevNextNav, ReportMetaHeader } from '@/components/report/report-meta-header';
+import { ReportDetailActions } from '@/components/report/report-detail-actions';
 import { ErrorState } from '@/components/common/states';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageContainer } from '@/components/common/page';
@@ -15,7 +16,7 @@ const route = getRouteApi('/w/$ws/r/$reportId');
  * the stream.
  */
 export function ReportDetailPage() {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   const { reportId } = route.useParams();
   const query = useReport(workspace.id, reportId);
 
@@ -45,7 +46,21 @@ export function ReportDetailPage() {
   return (
     <PageContainer>
       <article className="flex flex-col gap-6">
-        <ReportMetaHeader ws={workspace.slug} report={report} />
+        <ReportMetaHeader
+          ws={workspace.slug}
+          report={report}
+          actions={
+            canManageReports(role) ? (
+              <ReportDetailActions
+                wsId={workspace.id}
+                wsSlug={workspace.slug}
+                reportId={report.id}
+                streamId={report.stream.id}
+                archived={report.archivedAt !== null}
+              />
+            ) : null
+          }
+        />
         {report.blocks.length === 0 ? (
           <p className="text-sm text-muted-foreground">This report has no blocks.</p>
         ) : (

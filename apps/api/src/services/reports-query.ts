@@ -417,6 +417,8 @@ export interface ReportDetail {
     occurredAt: string;
     receivedAt: string;
     createdAt: string;
+    /** Archive marker — null when active, ISO timestamp when archived. */
+    archivedAt: string | null;
     tags: string[];
     blocks: unknown[];
     source: { id: string; name: string };
@@ -452,6 +454,7 @@ export async function getReportDetail(
       occurredAt: reports.occurredAt,
       receivedAt: reports.receivedAt,
       createdAt: reports.createdAt,
+      archivedAt: reports.archivedAt,
       tags: reports.tags,
       blocks: reports.blocks,
       cursorTs: cursorTsExpr,
@@ -477,6 +480,7 @@ export async function getReportDetail(
     occurredAt: Date;
     receivedAt: Date;
     createdAt: Date;
+    archivedAt: Date | null;
     tags: string[];
     blocks: unknown[];
     cursorTs: string;
@@ -525,6 +529,7 @@ export async function getReportDetail(
       occurredAt: row.occurredAt.toISOString(),
       receivedAt: row.receivedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
+      archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
       tags: row.tags,
       blocks: row.blocks,
       source: { id: row.sourceId, name: row.sourceName },

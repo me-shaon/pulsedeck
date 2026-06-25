@@ -176,6 +176,8 @@ export interface ReportDetail {
   occurredAt: string;
   receivedAt: string;
   createdAt: string;
+  /** Archive marker — null when active, ISO timestamp when archived. */
+  archivedAt: string | null;
   tags: string[];
   blocks: Block[];
   source: ReportRef;

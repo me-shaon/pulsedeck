@@ -576,6 +576,7 @@ describeIfDb('reports read APIs (integration)', () => {
       source: { id: sourceId },
     });
     expect(typeof d3.report.createdAt).toBe('string');
+    expect(d3.report.archivedAt).toBeNull(); // active report
     expect(d3.prevReportId).toBeNull(); // newest → no newer neighbour
     expect(d3.nextReportId).toBe(r2);
 
@@ -586,6 +587,12 @@ describeIfDb('reports read APIs (integration)', () => {
 
     const middle = await get(`/api/v1/workspaces/${workspaceId}/reports/${r2}`);
     expect(middle.json()).toMatchObject({ prevReportId: r3, nextReportId: r1 });
+  });
+
+  it('detail exposes archivedAt for an archived report', async () => {
+    const res = await get(`/api/v1/workspaces/${workspaceId}/reports/${aArchived}`);
+    expect(res.statusCode).toBe(200);
+    expect(typeof res.json().report.archivedAt).toBe('string');
   });
 
   it('a foreign report → 404 (not addressable from this workspace)', async () => {

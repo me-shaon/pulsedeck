@@ -193,6 +193,16 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
       if (!target) return reply.code(404).send({ error: 'Member not found' });
 
+      // A caller may only act on members at or below their own rank. Without this
+      // an Admin (who holds `members:manage`) could demote an Owner while >1 owner
+      // exists, acting on a higher principal. `canGrantRole(caller, target.role)`
+      // is the same ceiling used for the granted role above.
+      if (!canGrantRole(request.workspaceRole!, target.role)) {
+        return reply
+          .code(403)
+          .send({ error: 'Cannot modify a member whose role is higher than your own' });
+      }
+
       // Never strip the workspace of its last owner.
       if (
         target.role === 'owner' &&
@@ -227,6 +237,14 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
         )
         .limit(1);
       if (!target) return reply.code(404).send({ error: 'Member not found' });
+
+      // Rank ceiling: an Admin cannot remove an Owner (acting on a higher
+      // principal). Owners can remove anyone, subject to the last-owner guard.
+      if (!canGrantRole(request.workspaceRole!, target.role)) {
+        return reply
+          .code(403)
+          .send({ error: 'Cannot remove a member whose role is higher than your own' });
+      }
 
       if (target.role === 'owner' && (await ownerCount(workspaceId)) === 1) {
         return reply.code(400).send({ error: 'Cannot remove the last owner' });

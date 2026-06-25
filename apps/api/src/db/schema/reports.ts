@@ -55,6 +55,11 @@ export const reports = pgTable(
     occurredAt: utcTimestamp('occurred_at').notNull(),
     receivedAt: serverTimestamp('received_at'),
     createdAt: serverTimestamp('created_at'),
+    // Manual archive marker. NULL = active (the default feed); a timestamp =
+    // archived (hidden from the default feed, still searchable and shown in the
+    // archived view). Reports stay otherwise append-only — this is the one
+    // mutable column, set/cleared only by the archive/unarchive mutations.
+    archivedAt: utcTimestamp('archived_at'),
     tags: text('tags')
       .array()
       .notNull()
@@ -72,6 +77,14 @@ export const reports = pgTable(
     // Stream feed orders by server time (`received_at`), matching retention and
     // the realtime arrival order; `occurred_at` is agent-supplied and untrusted.
     index('reports_stream_received_idx').on(t.streamId, t.receivedAt.desc()),
+    // Partial index for the hot path: the default feed always filters
+    // `archived_at IS NULL`, so a partial index keeps it lean and fast and never
+    // carries archived rows.
+    index('reports_stream_active_received_idx')
+      .on(t.streamId, t.receivedAt.desc())
+      .where(sql`archived_at IS NULL`),
+    // Archived view: scope by stream, newest-archived first.
+    index('reports_stream_archived_idx').on(t.streamId, t.archivedAt.desc()),
     // Workspace-wide "All Reports" keyset: scope by workspace, page newest-first
     // on the `(received_at, id)` tiebroken order. Mirrors the stream-feed index
     // but at workspace granularity so the cross-stream list never full-sorts.

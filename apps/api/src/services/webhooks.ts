@@ -194,6 +194,7 @@ export async function enqueueTestDelivery(
         occurredAt: now,
         receivedAt: now,
         createdAt: now,
+        archivedAt: null,
         tags: ['test'],
         blocks: [],
         searchVector: '',

@@ -57,6 +57,13 @@
       "when": 1782207688482,
       "tag": "0007_fuzzy_fallen_one",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782389618692,
+      "tag": "0008_careful_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

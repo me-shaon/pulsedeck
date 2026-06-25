@@ -74,6 +74,7 @@ function makeReport(over: Partial<Report> = {}): Report {
     occurredAt: ts,
     receivedAt: ts,
     createdAt: ts,
+    archivedAt: null,
     tags: ['db', 'prod'],
     blocks: [],
     searchVector: '',

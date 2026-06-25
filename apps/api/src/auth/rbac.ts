@@ -16,6 +16,7 @@
  *   | Build dashboards            |   ✓   |   ✓   |   ✓    |   —    |
  *   | Manage webhooks             |   ✓   |   ✓   |   —    |   —    |
  *   | View reports                |   ✓   |   ✓   |   ✓    |   ✓    |
+ *   | Manage reports (archive/del)|   ✓   |   ✓   |   ✓    |   —    |
  */
 
 /** Workspace membership role (mirrors the `member_role` Postgres enum). */
@@ -30,7 +31,8 @@ export type Action =
   | 'streams:create'
   | 'dashboards:build'
   | 'webhooks:manage'
-  | 'reports:view';
+  | 'reports:view'
+  | 'reports:manage';
 
 /**
  * Action → roles allowed to perform it. Listing the allowed roles (rather than
@@ -46,6 +48,8 @@ const POLICY: Record<Action, readonly Role[]> = {
   'dashboards:build': ['owner', 'admin', 'editor'],
   'webhooks:manage': ['owner', 'admin'],
   'reports:view': ['owner', 'admin', 'editor', 'viewer'],
+  // Archive/unarchive/hard-delete reports. Editor+ may mutate; Viewer is read-only.
+  'reports:manage': ['owner', 'admin', 'editor'],
 };
 
 /** True when `role` is permitted to perform `action` per the PRD matrix. */

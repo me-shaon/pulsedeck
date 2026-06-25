@@ -20,6 +20,7 @@ const EXPECTED: Record<Action, Role[]> = {
   'dashboards:build': ['owner', 'admin', 'editor'],
   'webhooks:manage': ['owner', 'admin'],
   'reports:view': ['owner', 'admin', 'editor', 'viewer'],
+  'reports:manage': ['owner', 'admin', 'editor'],
 };
 
 describe('can(role, action) — PRD permission matrix', () => {

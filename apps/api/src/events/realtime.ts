@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import type { IngestionBus, ReportIngestedEvent } from './ingestion.js';
+import type { IngestionBus, ReportIngestedEvent, ReportLifecycleEvent } from './ingestion.js';
 
 /**
  * Realtime fan-out layer (PRD §7 "Realtime Updates" — the three tiers).
@@ -29,6 +29,7 @@ import type { IngestionBus, ReportIngestedEvent } from './ingestion.js';
  */
 
 const EVENT = 'report';
+const EVENT_LIFECYCLE = 'report.lifecycle';
 const DEFAULT_CHANNEL = 'pulsedeck:report.ingested';
 
 /** Compact, JSON-safe payload fanned out to SSE clients (no blocks). */
@@ -46,11 +47,26 @@ export interface RealtimeReportEvent {
 
 export type RealtimeHandler = (event: RealtimeReportEvent) => void;
 
+/**
+ * Compact lifecycle payload (archive/unarchive/delete) fanned out to SSE clients.
+ * Already id-only — the client invalidates the affected stream's report lists.
+ */
+export interface RealtimeLifecycleEvent {
+  kind: 'archived' | 'unarchived' | 'deleted';
+  workspaceId: string;
+  streamId: string;
+  reportIds: string[];
+}
+
+export type RealtimeLifecycleHandler = (event: RealtimeLifecycleEvent) => void;
+
 export type RealtimeMode = 'in-process' | 'redis';
 
 export interface Realtime {
   /** Subscribe a local SSE connection; returns an unsubscribe function. */
   onReportIngested(handler: RealtimeHandler): () => void;
+  /** Subscribe to archive/unarchive/delete events; returns an unsubscribe function. */
+  onReportLifecycle(handler: RealtimeLifecycleHandler): () => void;
   /** Connect Redis when `REDIS_URL` is set; no-op (single-instance) otherwise. */
   start(): Promise<void>;
   /** Detach the bus subscription and close Redis connections. */
@@ -124,10 +140,25 @@ export function toRealtimeEvent(event: ReportIngestedEvent): RealtimeReportEvent
   };
 }
 
-/** Envelope published to Redis so receivers can drop their own echoes. */
+/** Project a bus lifecycle event onto the compact realtime payload (id-only). */
+export function toRealtimeLifecycleEvent(event: ReportLifecycleEvent): RealtimeLifecycleEvent {
+  return {
+    kind: event.kind,
+    workspaceId: event.workspaceId,
+    streamId: event.streamId,
+    reportIds: event.reportIds,
+  };
+}
+
+/**
+ * Envelope published to Redis so receivers can drop their own echoes. `type`
+ * discriminates the two event families on the shared channel; it is optional on
+ * the wire and defaults to `ingested` so older-format messages still decode.
+ */
 interface RedisEnvelope {
   origin: string;
-  event: RealtimeReportEvent;
+  type?: 'ingested' | 'lifecycle';
+  event: RealtimeReportEvent | RealtimeLifecycleEvent;
 }
 
 class RealtimeFanout implements Realtime {
@@ -143,6 +174,7 @@ class RealtimeFanout implements Realtime {
   private readonly instanceId = `rt_${randomUUID()}`;
 
   private unsubBus: (() => void) | null = null;
+  private unsubLifecycleBus: (() => void) | null = null;
   private pub: RedisLike | null = null;
   private sub: RedisLike | null = null;
   private started = false;
@@ -159,8 +191,9 @@ class RealtimeFanout implements Realtime {
 
     // Subscribe to the in-process bus immediately so local SSE fan-out works
     // even before start() and with no Redis at all. Exactly ONE bus listener
-    // backs every SSE client (no per-client bus subscription).
+    // per event family backs every SSE client (no per-client bus subscription).
     this.unsubBus = this.bus.onReportIngested((e) => this.onLocalIngest(e));
+    this.unsubLifecycleBus = this.bus.onReportLifecycle((e) => this.onLocalLifecycle(e));
   }
 
   get mode(): RealtimeMode {
@@ -171,6 +204,13 @@ class RealtimeFanout implements Realtime {
     this.local.on(EVENT, handler);
     return () => {
       this.local.off(EVENT, handler);
+    };
+  }
+
+  onReportLifecycle(handler: RealtimeLifecycleHandler): () => void {
+    this.local.on(EVENT_LIFECYCLE, handler);
+    return () => {
+      this.local.off(EVENT_LIFECYCLE, handler);
     };
   }
 
@@ -221,6 +261,10 @@ class RealtimeFanout implements Realtime {
       this.unsubBus();
       this.unsubBus = null;
     }
+    if (this.unsubLifecycleBus) {
+      this.unsubLifecycleBus();
+      this.unsubLifecycleBus = null;
+    }
     this.local.removeAllListeners();
     await this.disconnectRedis();
   }
@@ -228,15 +272,22 @@ class RealtimeFanout implements Realtime {
   /** Local committed report: deliver to this replica's SSE clients + fan to Redis. */
   private onLocalIngest(e: ReportIngestedEvent): void {
     const evt = toRealtimeEvent(e);
-    this.emitLocal(evt);
-    this.publish(evt);
+    this.emitLocal(EVENT, evt);
+    this.publish('ingested', evt);
   }
 
-  /** Deliver to local SSE subscribers with per-subscriber error isolation. */
-  private emitLocal(evt: RealtimeReportEvent): void {
-    for (const listener of this.local.listeners(EVENT)) {
+  /** Local lifecycle change: deliver to this replica's SSE clients + fan to Redis. */
+  private onLocalLifecycle(e: ReportLifecycleEvent): void {
+    const evt = toRealtimeLifecycleEvent(e);
+    this.emitLocal(EVENT_LIFECYCLE, evt);
+    this.publish('lifecycle', evt);
+  }
+
+  /** Deliver to local SSE subscribers of `name` with per-subscriber error isolation. */
+  private emitLocal(name: string, evt: RealtimeReportEvent | RealtimeLifecycleEvent): void {
+    for (const listener of this.local.listeners(name)) {
       try {
-        (listener as RealtimeHandler)(evt);
+        (listener as (e: typeof evt) => void)(evt);
       } catch (err) {
         this.logger.error('[realtime] sse subscriber threw', err);
       }
@@ -244,9 +295,12 @@ class RealtimeFanout implements Realtime {
   }
 
   /** Publish a LOCALLY-originated event to Redis (no-op without Redis). */
-  private publish(evt: RealtimeReportEvent): void {
+  private publish(
+    type: 'ingested' | 'lifecycle',
+    evt: RealtimeReportEvent | RealtimeLifecycleEvent,
+  ): void {
     if (!this.pub) return;
-    const envelope: RedisEnvelope = { origin: this.instanceId, event: evt };
+    const envelope: RedisEnvelope = { origin: this.instanceId, type, event: evt };
     try {
       const result = this.pub.publish(this.channel, JSON.stringify(envelope));
       // ioredis returns a promise; swallow rejections (Redis down → degrade).
@@ -273,7 +327,12 @@ class RealtimeFanout implements Realtime {
     if (!envelope || typeof envelope !== 'object' || !envelope.event) return;
     // No echo loop: drop messages this process published.
     if (envelope.origin === this.instanceId) return;
-    this.emitLocal(envelope.event);
+    // `type` is optional on the wire (older format) — default to ingested.
+    if (envelope.type === 'lifecycle') {
+      this.emitLocal(EVENT_LIFECYCLE, envelope.event as RealtimeLifecycleEvent);
+    } else {
+      this.emitLocal(EVENT, envelope.event as RealtimeReportEvent);
+    }
   }
 
   private async disconnectRedis(): Promise<void> {

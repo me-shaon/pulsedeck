@@ -29,17 +29,43 @@ export interface ReportIngestedEvent {
 /** Handler invoked for each ingested report. */
 export type ReportIngestedHandler = (event: ReportIngestedEvent) => void;
 
+/** Lifecycle change to existing reports (the archive feature). */
+export type ReportLifecycleKind = 'archived' | 'unarchived' | 'deleted';
+
+/**
+ * Payload published when existing reports are archived, unarchived, or deleted.
+ * Carries only ids (one event batches a whole bulk operation per stream) so SSE
+ * clients can invalidate cheaply — never the report bodies.
+ */
+export interface ReportLifecycleEvent {
+  kind: ReportLifecycleKind;
+  workspaceId: string;
+  streamId: string;
+  reportIds: string[];
+}
+
+/** Handler invoked for each report-lifecycle change. */
+export type ReportLifecycleHandler = (event: ReportLifecycleEvent) => void;
+
 /**
  * Minimal pub/sub surface the pipeline depends on. Kept tiny and interface-first
  * so Phase 10 can drop in a Redis-backed implementation transparently.
+ *
+ * Note: despite the `Ingestion` name (historical — it began as ingest-only),
+ * this bus also carries report-lifecycle events. Generalizing the name is a
+ * deferred cosmetic cleanup; the realtime layer and SSE route consume both.
  */
 export interface IngestionBus {
   emitReportIngested(event: ReportIngestedEvent): void;
   /** Subscribe; returns an unsubscribe function. */
   onReportIngested(handler: ReportIngestedHandler): () => void;
+  emitReportLifecycle(event: ReportLifecycleEvent): void;
+  /** Subscribe to archive/unarchive/delete events; returns an unsubscribe function. */
+  onReportLifecycle(handler: ReportLifecycleHandler): () => void;
 }
 
 const EVENT = 'report.ingested';
+const EVENT_LIFECYCLE = 'report.lifecycle';
 
 /** Single-process {@link IngestionBus} backed by a Node {@link EventEmitter}. */
 class InProcessIngestionBus implements IngestionBus {
@@ -64,6 +90,23 @@ class InProcessIngestionBus implements IngestionBus {
   onReportIngested(handler: ReportIngestedHandler): () => void {
     this.emitter.on(EVENT, handler);
     return () => this.emitter.off(EVENT, handler);
+  }
+
+  emitReportLifecycle(event: ReportLifecycleEvent): void {
+    // Same per-subscriber isolation as ingest: a throwing SSE/webhook handler
+    // must not propagate out of the mutation that emitted this event.
+    for (const listener of this.emitter.listeners(EVENT_LIFECYCLE)) {
+      try {
+        (listener as ReportLifecycleHandler)(event);
+      } catch (err) {
+        console.error('[ingestion-bus] report.lifecycle subscriber threw', err);
+      }
+    }
+  }
+
+  onReportLifecycle(handler: ReportLifecycleHandler): () => void {
+    this.emitter.on(EVENT_LIFECYCLE, handler);
+    return () => this.emitter.off(EVENT_LIFECYCLE, handler);
   }
 }
 

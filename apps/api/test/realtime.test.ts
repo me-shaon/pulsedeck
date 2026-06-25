@@ -3,10 +3,16 @@ import type { Auth } from '../src/auth/auth.js';
 import type { Db } from '../src/db/index.js';
 import type { Report } from '../src/db/index.js';
 import type { Sql } from '../src/db.js';
-import { createIngestionBus, type ReportIngestedEvent } from '../src/events/ingestion.js';
+import {
+  createIngestionBus,
+  type ReportIngestedEvent,
+  type ReportLifecycleEvent,
+} from '../src/events/ingestion.js';
 import {
   createRealtime,
   toRealtimeEvent,
+  toRealtimeLifecycleEvent,
+  type RealtimeLifecycleEvent,
   type RealtimeReportEvent,
   type RedisLike,
 } from '../src/events/realtime.js';
@@ -91,6 +97,85 @@ describe('toRealtimeEvent', () => {
     });
     // Never carries blocks.
     expect('blocks' in evt).toBe(false);
+  });
+});
+
+function lifecycle(workspaceId: string, kind: ReportLifecycleEvent['kind']): ReportLifecycleEvent {
+  return { kind, workspaceId, streamId: `stm-${workspaceId}`, reportIds: ['r1', 'r2'] };
+}
+
+describe('toRealtimeLifecycleEvent', () => {
+  it('projects a bus lifecycle event onto the id-only realtime payload', () => {
+    const evt = toRealtimeLifecycleEvent(lifecycle('ws1', 'archived'));
+    expect(evt).toEqual({
+      kind: 'archived',
+      workspaceId: 'ws1',
+      streamId: 'stm-ws1',
+      reportIds: ['r1', 'r2'],
+    });
+  });
+});
+
+describe('realtime lifecycle fan-out', () => {
+  it('fans a local lifecycle event to subscribers and isolates by workspace', async () => {
+    const bus = createIngestionBus();
+    const rt = createRealtime({ bus, logger: silentLogger });
+    await rt.start();
+
+    const wsA: RealtimeLifecycleEvent[] = [];
+    rt.onReportLifecycle((e) => {
+      if (e.workspaceId === 'wsA') wsA.push(e);
+    });
+    const wsB: RealtimeLifecycleEvent[] = [];
+    rt.onReportLifecycle((e) => {
+      if (e.workspaceId === 'wsB') wsB.push(e);
+    });
+
+    bus.emitReportLifecycle(lifecycle('wsA', 'deleted'));
+
+    expect(wsA.map((e) => e.kind)).toEqual(['deleted']);
+    expect(wsB).toEqual([]);
+    await rt.close();
+  });
+
+  it('publishes lifecycle events to Redis tagged type=lifecycle, and re-emits remote ones', async () => {
+    const clients: FakeRedis[] = [];
+    const bus = createIngestionBus();
+    const rt = createRealtime({
+      bus,
+      redisUrl: 'redis://localhost:6379',
+      channel: 'test:rt',
+      logger: silentLogger,
+      createRedisClient: (url) => {
+        const c = new FakeRedis(url);
+        clients.push(c);
+        return c;
+      },
+    });
+    await rt.start();
+
+    const received: RealtimeLifecycleEvent[] = [];
+    rt.onReportLifecycle((e) => received.push(e));
+
+    // Local emit → delivered locally AND published with type 'lifecycle'.
+    bus.emitReportLifecycle(lifecycle('wsA', 'archived'));
+    expect(received.map((e) => e.kind)).toEqual(['archived']);
+    const env = JSON.parse(clients[0].published[0].message);
+    expect(env.type).toBe('lifecycle');
+    expect(env.event.reportIds).toEqual(['r1', 'r2']);
+
+    // Remote lifecycle event arrives → re-emitted locally, not re-published.
+    clients[1].deliver(
+      'test:rt',
+      JSON.stringify({
+        origin: 'other',
+        type: 'lifecycle',
+        event: { kind: 'unarchived', workspaceId: 'wsA', streamId: 'stm', reportIds: ['r9'] },
+      }),
+    );
+    expect(received.map((e) => e.kind)).toEqual(['archived', 'unarchived']);
+    expect(clients[0].published).toHaveLength(1); // remote not re-published
+    await rt.close();
   });
 });
 

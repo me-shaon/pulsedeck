@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { makeRequireAuth, makeRequireWorkspaceRole } from '../auth/fastify.js';
-import type { Realtime, RealtimeReportEvent } from '../events/realtime.js';
+import type { Realtime, RealtimeLifecycleEvent, RealtimeReportEvent } from '../events/realtime.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -67,6 +67,7 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
 
     let open = true;
     let unsubscribe: () => void = () => {};
+    let unsubscribeLifecycle: () => void = () => {};
     let heartbeat: ReturnType<typeof setInterval> | null = null;
 
     const cleanup = (): void => {
@@ -74,8 +75,9 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
       open = false;
       if (heartbeat) clearInterval(heartbeat);
       heartbeat = null;
-      // Remove the realtime subscription — the critical no-leak guarantee.
+      // Remove the realtime subscriptions — the critical no-leak guarantee.
       unsubscribe();
+      unsubscribeLifecycle();
       try {
         raw.end();
       } catch {
@@ -94,7 +96,20 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
       }
     };
 
+    // Archive/unarchive/delete: one frame per bulk op, named `report-<kind>` so
+    // the client can invalidate the affected stream's report lists.
+    const sendLifecycle = (event: RealtimeLifecycleEvent): void => {
+      if (!open) return;
+      if (event.workspaceId !== workspaceId) return;
+      try {
+        raw.write(`event: report-${event.kind}\ndata: ${JSON.stringify(event)}\n\n`);
+      } catch {
+        cleanup();
+      }
+    };
+
     unsubscribe = app.realtime.onReportIngested(send);
+    unsubscribeLifecycle = app.realtime.onReportLifecycle(sendLifecycle);
 
     heartbeat = setInterval(() => {
       if (!open) return;

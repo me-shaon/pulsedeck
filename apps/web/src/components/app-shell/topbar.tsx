@@ -14,12 +14,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useCurrentWorkspace } from '@/lib/workspace-context';
+import { useSseConnected } from '@/hooks/use-live-updates';
 import { useWorkspaces } from '@/hooks/use-workspace-data';
 
 export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const { workspace } = useCurrentWorkspace();
   const workspaces = useWorkspaces();
+  // The cadence pulse is a real liveness indicator: the comet travels only while
+  // the SSE stream is connected; on the polling fallback it falls to a static line.
+  const live = useSseConnected();
 
   const initial = workspace.name.charAt(0).toUpperCase();
 
@@ -63,11 +67,19 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className={cn('ml-auto hidden items-center gap-2 md:flex')}>
-        <span className="text-[0.6875rem] uppercase tracking-wider text-muted-foreground">
+      <div
+        className={cn('ml-auto hidden items-center gap-2 md:flex')}
+        title={live ? 'Live — receiving realtime updates' : 'Polling — realtime stream offline'}
+      >
+        <span
+          className={cn(
+            'text-[0.6875rem] uppercase tracking-wider transition-colors',
+            live ? 'text-muted-foreground' : 'text-muted-foreground/50',
+          )}
+        >
           Cadence
         </span>
-        <PulseLine width={180} height={28} beats={4} speed={4.5} />
+        <PulseLine width={180} height={28} beats={4} speed={4.5} live={live} />
       </div>
 
       <div className="ml-auto flex items-center gap-1 md:ml-4">

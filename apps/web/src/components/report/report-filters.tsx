@@ -5,6 +5,8 @@ import type { ReportFilters, Source, Tree } from '@/lib/api-types';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DateRangeField } from '@/components/ui/date-range';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
   SelectContent,
@@ -29,12 +31,15 @@ export function ReportFiltersBar({
   onChange,
   sources,
   tree,
+  tags,
   hideStreamFilter = false,
 }: {
   filters: ReportFilters;
   onChange: (next: ReportFilters) => void;
   sources?: Source[];
   tree?: Tree;
+  /** Distinct workspace tags — options for the tag multi-select. */
+  tags?: string[];
   /** Hide category/stream selects when already scoped to a stream feed. */
   hideStreamFilter?: boolean;
 }) {
@@ -58,11 +63,6 @@ export function ReportFiltersBar({
     }
   }, [debouncedQ]);
 
-  const [tagsText, setTagsText] = useState((filters.tags ?? []).join(', '));
-  useEffect(() => {
-    setTagsText((filters.tags ?? []).join(', '));
-  }, [filters.tags]);
-
   const streams = useMemo(() => {
     if (!tree) return [];
     const cats = filters.category
@@ -85,14 +85,6 @@ export function ReportFiltersBar({
 
   function set<K extends keyof ReportFilters>(key: K, value: ReportFilters[K]) {
     onChange({ ...filters, [key]: value } as ReportFilters);
-  }
-
-  function commitTags() {
-    const parsed = tagsText
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-    onChange({ ...filters, tags: parsed.length ? parsed : undefined });
   }
 
   return (
@@ -219,39 +211,24 @@ export function ReportFiltersBar({
           </>
         ) : null}
 
-        <FilterField label="From">
-          <Input
-            type="date"
-            value={filters.from ? filters.from.slice(0, 10) : ''}
-            onChange={(e) =>
-              set('from', e.target.value ? `${e.target.value}T00:00:00Z` : undefined)
-            }
-            aria-label="From date"
-            className="w-36"
-          />
-        </FilterField>
-        <FilterField label="To">
-          <Input
-            type="date"
-            value={filters.to ? filters.to.slice(0, 10) : ''}
-            onChange={(e) => set('to', e.target.value ? `${e.target.value}T23:59:59Z` : undefined)}
-            aria-label="To date"
-            className="w-36"
+        <FilterField label="Date">
+          <DateRangeField
+            value={{ from: filters.from, to: filters.to }}
+            onChange={(range) => onChange({ ...filters, from: range.from, to: range.to })}
           />
         </FilterField>
 
         <FilterField label="Tags">
-          <Input
-            value={tagsText}
-            onChange={(e) => setTagsText(e.target.value)}
-            onBlur={commitTags}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitTags();
-            }}
-            placeholder="prod, db"
-            aria-label="Filter by tags (comma-separated)"
-            className="w-40"
-          />
+          <div className="w-44">
+            <MultiSelect
+              options={(tags ?? []).map((t) => ({ value: t, label: t }))}
+              value={filters.tags ?? []}
+              onChange={(next) => set('tags', next.length ? next : undefined)}
+              ariaLabel="Filter by tags"
+              placeholder="Search tags…"
+              emptyLabel="All tags"
+            />
+          </div>
         </FilterField>
       </div>
     </div>

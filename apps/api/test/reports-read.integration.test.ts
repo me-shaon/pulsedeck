@@ -627,6 +627,16 @@ describeIfDb('reports read APIs (integration)', () => {
     expect(empty.lastReportAt).toBeNull();
   });
 
+  it('tags endpoint returns the workspace distinct tags, sorted', async () => {
+    const res = await get(`/api/v1/workspaces/${workspaceId}/tags`);
+    expect(res.statusCode).toBe(200);
+    const tags: string[] = res.json().tags;
+    // Seeded tags across ws1 reports: prod, deploy, staging, db, cost, seo.
+    expect(tags).toEqual(['cost', 'db', 'deploy', 'prod', 'seo', 'staging']);
+    // Foreign-workspace tags never leak (the foreign report has none anyway).
+    expect(tags).not.toContain('zzz');
+  });
+
   // --- RBAC ------------------------------------------------------------------
 
   it('a Viewer can read (reports:view allows all roles)', async () => {

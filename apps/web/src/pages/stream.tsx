@@ -3,7 +3,7 @@ import { searchToFilters, filtersToSearch } from '@/lib/report-search';
 import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReportsInfinite } from '@/hooks/use-reports';
 import { useReportCounts } from '@/hooks/use-report-counts';
-import { useSources, useTree } from '@/hooks/use-workspace-data';
+import { useSources, useTree, useWorkspaceTags } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
 import { ReportFiltersBar } from '@/components/report/report-filters';
 import { PageContainer, PageHeader } from '@/components/common/page';
@@ -20,6 +20,7 @@ export function StreamPage() {
 
   const tree = useTree(workspace.id);
   const sources = useSources(workspace.id);
+  const tags = useWorkspaceTags(workspace.id);
   const query = useReportsInfinite({ wsId: workspace.id, filters, streamId });
   const counts = useReportCounts({ wsId: workspace.id, filters, streamId });
 
@@ -43,6 +44,7 @@ export function StreamPage() {
           onChange={(next) => navigate({ search: filtersToSearch(next), replace: true })}
           sources={sources.data}
           tree={tree.data}
+          tags={tags.data}
           hideStreamFilter
         />
       </div>

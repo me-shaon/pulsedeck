@@ -315,6 +315,10 @@ export const getReport = (wsId: string, reportId: string, signal?: AbortSignal) 
 export const getTree = (wsId: string, signal?: AbortSignal) =>
   request<Tree>(`/workspaces/${wsId}/tree`, { signal });
 
+/** Distinct tags used across the workspace — options for the tag filter. */
+export const getWorkspaceTags = (wsId: string, signal?: AbortSignal) =>
+  request<{ tags: string[] }>(`/workspaces/${wsId}/tags`, { signal });
+
 // --- Structure (manual category/stream management) -----------------------
 
 export const createCategory = (wsId: string, input: { name: string; slug?: string }) =>

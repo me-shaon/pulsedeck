@@ -5,6 +5,7 @@ import {
   getReportDetail,
   getTree,
   listReports,
+  listWorkspaceTags,
   parseListQuery,
   streamInWorkspace,
 } from '../services/reports-query.js';
@@ -114,5 +115,11 @@ export async function reportReadRoutes(app: FastifyInstance): Promise<void> {
     const { id: workspaceId } = request.params as { id: string };
     const categories = await getTree(db, workspaceId);
     return reply.send({ categories });
+  });
+
+  // --- Distinct tags in the workspace (tag filter options) -------------------
+  app.get('/api/v1/workspaces/:id/tags', { preHandler: viewGate }, async (request, reply) => {
+    const { id: workspaceId } = request.params as { id: string };
+    return reply.send({ tags: await listWorkspaceTags(db, workspaceId) });
   });
 }

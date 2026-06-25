@@ -3,7 +3,7 @@ import { searchToFilters, filtersToSearch } from '@/lib/report-search';
 import { canManageReports, useCurrentWorkspace } from '@/lib/workspace-context';
 import { useReportsInfinite } from '@/hooks/use-reports';
 import { useReportCounts } from '@/hooks/use-report-counts';
-import { useSources, useTree } from '@/hooks/use-workspace-data';
+import { useSources, useTree, useWorkspaceTags } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
 import { ReportFiltersBar } from '@/components/report/report-filters';
 import { PageContainer, PageHeader } from '@/components/common/page';
@@ -24,6 +24,7 @@ export function SearchPage() {
   const counts = useReportCounts({ wsId: workspace.id, filters });
   const sources = useSources(workspace.id);
   const tree = useTree(workspace.id);
+  const tags = useWorkspaceTags(workspace.id);
 
   return (
     <PageContainer>
@@ -37,6 +38,7 @@ export function SearchPage() {
           onChange={(next) => navigate({ search: filtersToSearch(next), replace: true })}
           sources={sources.data}
           tree={tree.data}
+          tags={tags.data}
         />
       </div>
       <ReportList

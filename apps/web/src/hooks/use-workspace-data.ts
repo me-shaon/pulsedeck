@@ -8,6 +8,7 @@ import {
   getReport,
   getStreamInstructions,
   getTree,
+  getWorkspaceTags,
   listSources,
   listWorkspaces,
   renameCategory,
@@ -34,6 +35,15 @@ export function useTree(wsId: string) {
     queryKey: queryKeys.tree(wsId),
     queryFn: ({ signal }) => getTree(wsId, signal),
     refetchInterval,
+  });
+}
+
+/** Distinct workspace tags (options for the tag filter). */
+export function useWorkspaceTags(wsId: string) {
+  return useQuery({
+    queryKey: ['tags', wsId],
+    queryFn: ({ signal }) => getWorkspaceTags(wsId, signal),
+    select: (r) => r.tags,
   });
 }
 

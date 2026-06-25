@@ -392,6 +392,18 @@ export async function countReports(
   return { active: row?.active ?? 0, archived: row?.archived ?? 0 };
 }
 
+/**
+ * Distinct tags used by any report in the workspace, sorted — drives the tag
+ * filter's multi-select options. `unnest` flattens the per-report `tags` arrays;
+ * `distinct` + `order by` give a stable, deduped list.
+ */
+export async function listWorkspaceTags(db: Db, workspaceId: string): Promise<string[]> {
+  const rows = (await db.execute(
+    sql`select distinct unnest(tags) as tag from reports where workspace_id = ${workspaceId} order by tag`,
+  )) as unknown as Array<{ tag: string }>;
+  return rows.map((r) => r.tag);
+}
+
 /** True when `streamId` belongs to `workspaceId` (else the caller 404s). */
 export async function streamInWorkspace(
   db: Db,

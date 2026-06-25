@@ -357,6 +357,9 @@ export interface AlertItem {
   stream: StreamRef;
 }
 
+/** Archive scope of a report list query. Absent = `active` (the default feed). */
+export type ArchiveScope = 'active' | 'archived' | 'all';
+
 /** Filters that drive the report list query (also serialized into the URL). */
 export interface ReportFilters {
   q?: string;
@@ -367,6 +370,8 @@ export interface ReportFilters {
   tags?: string[];
   from?: string;
   to?: string;
+  /** `active` (default) hides archived; `archived` shows only archived; `all` shows both. */
+  archived?: ArchiveScope;
 }
 
 // --- Webhooks ------------------------------------------------------------

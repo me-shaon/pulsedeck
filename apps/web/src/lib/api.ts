@@ -278,6 +278,9 @@ function filterQuery(filters: ReportFilters, limit?: number, cursor?: string) {
     tags: filters.tags,
     from: filters.from,
     to: filters.to,
+    // Omit the default `active` so the common feed URL stays clean; the server
+    // defaults to active when the param is absent.
+    archived: filters.archived && filters.archived !== 'active' ? filters.archived : undefined,
   };
 }
 
@@ -357,6 +360,29 @@ export const deleteStream = (wsId: string, streamId: string) =>
 export const reorderStreams = (wsId: string, categoryId: string, ids: string[]) =>
   request<{ ok: true }>(`/workspaces/${wsId}/categories/${categoryId}/streams/reorder`, {
     method: 'PATCH',
+    body: { ids },
+  });
+
+// --- Report mutations (bulk archive / unarchive / hard-delete) -----------
+
+/** Archive the given reports (hide from the default feed; reversible). */
+export const archiveReports = (wsId: string, ids: string[]) =>
+  request<{ affected: number }>(`/workspaces/${wsId}/reports/bulk/archive`, {
+    method: 'POST',
+    body: { ids },
+  });
+
+/** Unarchive the given reports (return them to the active feed). */
+export const unarchiveReports = (wsId: string, ids: string[]) =>
+  request<{ affected: number }>(`/workspaces/${wsId}/reports/bulk/unarchive`, {
+    method: 'POST',
+    body: { ids },
+  });
+
+/** Permanently hard-delete the given reports (no recovery). */
+export const deleteReports = (wsId: string, ids: string[]) =>
+  request<{ affected: number }>(`/workspaces/${wsId}/reports/bulk/delete`, {
+    method: 'POST',
     body: { ids },
   });
 

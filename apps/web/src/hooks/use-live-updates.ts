@@ -40,6 +40,16 @@ interface ReportEventPayload {
   title: string;
 }
 
+/**
+ * Compact lifecycle event payload (archive/unarchive/delete). Id-only — the
+ * client just refreshes the affected stream's lists and the tree counts.
+ */
+interface ReportLifecyclePayload {
+  kind: 'archived' | 'unarchived' | 'deleted';
+  streamId: string;
+  reportIds: string[];
+}
+
 // --- "SSE connected" signal -------------------------------------------------
 // A tiny module-level store read via useSyncExternalStore, so `useLiveInterval`
 // can observe connection state without prop drilling. Only one workspace is
@@ -92,6 +102,21 @@ function invalidateForReport(wsId: string, payload: ReportEventPayload): void {
   void queryClient.invalidateQueries({ queryKey: queryKeys.report(wsId, payload.reportId) });
 }
 
+/**
+ * Invalidate the keys affected by an archive/unarchive/delete on OTHER tabs.
+ * Covers every report list scope (active feed, archived view, search) via the
+ * `['reports', wsId]` prefix, plus the tree counts.
+ */
+function invalidateForLifecycle(wsId: string, payload: ReportLifecyclePayload): void {
+  void queryClient.invalidateQueries({ queryKey: ['reports', wsId] });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.tree(wsId) });
+  // A deleted report's detail can never resolve again; archived/unarchived ones
+  // are unchanged, so invalidating their details is harmless.
+  for (const reportId of payload.reportIds) {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.report(wsId, reportId) });
+  }
+}
+
 // --- Subscription hook ------------------------------------------------------
 
 /**
@@ -121,8 +146,25 @@ export function useWorkspaceLiveUpdates(workspaceId: string | undefined): void {
       invalidateForReport(workspaceId, payload);
     };
 
+    const handleLifecycle = (event: MessageEvent<string>) => {
+      let payload: ReportLifecyclePayload;
+      try {
+        payload = JSON.parse(event.data) as ReportLifecyclePayload;
+      } catch {
+        return;
+      }
+      if (!payload || typeof payload.streamId !== 'string' || !Array.isArray(payload.reportIds)) {
+        return;
+      }
+      invalidateForLifecycle(workspaceId, payload);
+    };
+
     source.addEventListener('open', () => setConnected(true));
     source.addEventListener('report', handleReport as EventListener);
+    // Archive/unarchive/delete lifecycle events (one named event per kind).
+    source.addEventListener('report-archived', handleLifecycle as EventListener);
+    source.addEventListener('report-unarchived', handleLifecycle as EventListener);
+    source.addEventListener('report-deleted', handleLifecycle as EventListener);
     source.addEventListener('error', () => {
       // Network drop, 503 (sse_disabled), or proxy hiccup. EventSource
       // auto-reconnects; until it reopens, mark disconnected so polling resumes.

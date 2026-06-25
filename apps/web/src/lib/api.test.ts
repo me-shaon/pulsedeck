@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getAuthConfig, listReports, removeMember, setup } from './api';
+import {
+  ApiError,
+  archiveReports,
+  deleteReports,
+  getAuthConfig,
+  listReports,
+  removeMember,
+  setup,
+  unarchiveReports,
+} from './api';
 
 /**
  * Unit tests for the typed `fetch` wrapper. We stub the global `fetch` and
@@ -80,6 +89,43 @@ describe('request building', () => {
     // Empty string `q` and undefined cursor must be omitted entirely.
     expect(qs.has('q')).toBe(false);
     expect(qs.has('cursor')).toBe(false);
+  });
+
+  it('omits the default "active" archive scope but sends "archived"/"all"', async () => {
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ reports: [], nextCursor: null })),
+    );
+
+    await listReports('ws_1', { archived: 'active' });
+    expect(new URL(fetchMock.mock.calls[0][0], 'http://x').searchParams.has('archived')).toBe(
+      false,
+    );
+
+    await listReports('ws_1', { archived: 'archived' });
+    expect(new URL(fetchMock.mock.calls[1][0], 'http://x').searchParams.get('archived')).toBe(
+      'archived',
+    );
+
+    await listReports('ws_1', { archived: 'all' });
+    expect(new URL(fetchMock.mock.calls[2][0], 'http://x').searchParams.get('archived')).toBe(
+      'all',
+    );
+  });
+
+  it.each([
+    ['archive', archiveReports, '/api/v1/workspaces/ws_1/reports/bulk/archive'],
+    ['unarchive', unarchiveReports, '/api/v1/workspaces/ws_1/reports/bulk/unarchive'],
+    ['delete', deleteReports, '/api/v1/workspaces/ws_1/reports/bulk/delete'],
+  ])('%s POSTs the ids array to the bulk endpoint', async (_label, fn, expectedPath) => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ affected: 2 }));
+
+    const out = await fn('ws_1', ['r1', 'r2']);
+
+    expect(out).toEqual({ affected: 2 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(expectedPath);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ ids: ['r1', 'r2'] });
   });
 });
 

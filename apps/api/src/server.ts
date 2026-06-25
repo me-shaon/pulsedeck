@@ -1,4 +1,6 @@
+import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import { Redis } from 'ioredis';
 import { createAuth, type Auth, type AuthEnv } from './auth/auth.js';
 import { registerAuthHandler } from './auth/fastify.js';
 import { buildRuntimeConfig, type RuntimeConfig } from './config/runtime.js';
@@ -44,7 +46,22 @@ declare module 'fastify' {
     webhookEnqueuer: Enqueuer;
     /** Webhook delivery poller; `start()`ed in index.ts. */
     webhookRunner: WebhookRunner;
+    /** Shared rate-limit store across replicas; null = in-memory (single node). */
+    rateLimitRedis: Redis | null;
   }
+}
+
+/**
+ * Sensitive better-auth endpoints worth throttling against brute force /
+ * credential stuffing. High-frequency, non-guessable paths (get-session,
+ * sign-out, OAuth callbacks) are intentionally excluded so normal app traffic
+ * isn't rate limited.
+ */
+const SENSITIVE_AUTH_PATH =
+  /^\/api\/auth\/(sign-in|sign-up|forget-password|reset-password|request-password-reset|change-password|change-email|two-factor)/;
+
+function isSensitiveAuthPath(url: string): boolean {
+  return SENSITIVE_AUTH_PATH.test(url.split('?')[0]);
 }
 
 export interface BuildServerOptions {
@@ -102,10 +119,32 @@ export function buildServer({
   retention,
   webhookRunner,
 }: BuildServerOptions): FastifyInstance {
-  const app = Fastify({ logger });
+  // `trustProxy` so `request.ip` reflects the real client behind the reverse
+  // proxy (nginx) — required for the IP-keyed auth/ingest rate limits to bucket
+  // per client rather than lumping everyone under the proxy's address.
+  const app = Fastify({ logger, trustProxy: runtime.trustProxy });
 
   const dbInstance = db ?? createDrizzle(sql);
   const authInstance = auth ?? createAuth(dbInstance, env);
+
+  // Shared rate-limit store. With Redis the limits hold ACROSS replicas (and
+  // survive restarts); without it each node counts independently in memory.
+  let rateLimitRedis: Redis | null = null;
+  if (redisUrl) {
+    rateLimitRedis = new Redis(redisUrl, {
+      // Keep request latency bounded if Redis is slow/down; combined with the
+      // limiters' skipOnError (below) this fails OPEN rather than 500ing or
+      // locking users out. Offline queue stays on (default) so commands issued
+      // before the connection is ready buffer briefly instead of erroring.
+      maxRetriesPerRequest: 1,
+      connectionName: 'pulsedeck-ratelimit',
+    });
+    rateLimitRedis.on('error', (err: Error) => app.log.warn({ err }, 'rate-limit redis error'));
+  }
+  app.decorate('rateLimitRedis', rateLimitRedis);
+  app.addHook('onClose', async () => {
+    if (rateLimitRedis) await rateLimitRedis.quit().catch(() => {});
+  });
 
   app.decorate('sql', sql);
   app.decorate('db', dbInstance);
@@ -217,8 +256,23 @@ export function buildServer({
   });
 
   // better-auth's own endpoints (sign-in/up, OAuth callbacks, sign-out, …).
-  // `runtime` lets the handler gate self-serve sign-up by signup mode.
-  registerAuthHandler(app, authInstance, runtime);
+  // `runtime` lets the handler gate self-serve sign-up by signup mode. Mounted in
+  // an encapsulated scope so the brute-force rate limiter applies ONLY here (and
+  // only to the sensitive sub-paths, via allowList) — not to the rest of the API.
+  app.register(async (authScope) => {
+    await authScope.register(rateLimit, {
+      max: runtime.auth.max,
+      timeWindow: runtime.auth.timeWindow,
+      nameSpace: 'pd-rl-auth:',
+      ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
+      // Fail open if the store errors — never 500 or lock out auth on a Redis blip.
+      skipOnError: true,
+      keyGenerator: (request) => request.ip,
+      // Throttle only the brute-forceable paths; skip get-session/sign-out/OAuth.
+      allowList: (request) => !isSensitiveAuthPath(request.url),
+    });
+    registerAuthHandler(authScope, authInstance, runtime);
+  });
 
   app.register(healthRoutes);
   app.register(authRoutes);

@@ -64,7 +64,12 @@ const EnvSchema = z
     // How often the in-process retention sweep runs (ms). Only meaningful when
     // RETENTION_DAYS > 0. Default 1h. Min 1s so a misconfig can't busy-loop.
     RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().min(1000).default(3_600_000),
-    REDIS_URL: z.string().url('REDIS_URL must be a valid connection URL').optional(),
+    // Coerce empty string → undefined: the compose stack passes `REDIS_URL=""`
+    // when unset, which must mean "no Redis", not an invalid URL that fails boot.
+    REDIS_URL: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.string().url('REDIS_URL must be a valid connection URL').optional(),
+    ),
     // Realtime SSE master switch (PRD §7 "SSE on/off"). Default ON: the endpoint is
     // available and clients live-update. Set to a falsy value (false/0/no/off) to
     // force the Polling tier — the SSE endpoint then 503s and clients refetch on an
@@ -89,6 +94,20 @@ const EnvSchema = z
     //                        "1 minute" (default 60000 ms).
     INGEST_RATE_LIMIT: z.coerce.number().int().positive().default(120),
     INGEST_RATE_WINDOW: z.string().optional(),
+
+    // Brute-force throttle for the sensitive auth endpoints (sign-in/up, password
+    // reset). Keyed per client IP (so set TRUST_PROXY behind a reverse proxy).
+    //   AUTH_RATE_LIMIT  — max attempts per window (default 20).
+    //   AUTH_RATE_WINDOW — window as ms or an `ms`-style string (default 60000 ms).
+    AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(20),
+    AUTH_RATE_WINDOW: z.string().optional(),
+
+    // Reverse-proxy trust (Fastify `trustProxy`). Behind the bundled nginx set
+    // this to the number of proxy hops (`1`) so `request.ip` / X-Forwarded-* are
+    // the real client, not the proxy — required for IP-keyed rate limits to work.
+    // Accepts `true`/`false`, a hop count (`1`), or an IP/CIDR. Default off (safe:
+    // don't trust forwarded headers unless a proxy is actually in front).
+    TRUST_PROXY: z.string().optional(),
 
     // Transactional email seam (invites now; trial reminders/receipts later in
     // cloud). OSS leaves EMAIL_PROVIDER unset → the console no-op port: nothing is

@@ -73,6 +73,11 @@ export async function reportRoutes(app: FastifyInstance): Promise<void> {
   await app.register(rateLimit, {
     max: app.runtime.ingest.max,
     timeWindow: app.runtime.ingest.timeWindow,
+    nameSpace: 'pd-rl-ingest:',
+    // Shared store across replicas when Redis is configured (else in-memory).
+    ...(app.rateLimitRedis ? { redis: app.rateLimitRedis } : {}),
+    // Fail open on a store error rather than dropping legitimate ingestion.
+    skipOnError: true,
     keyGenerator(request) {
       const header = request.headers.authorization;
       if (header?.startsWith('Bearer ')) {

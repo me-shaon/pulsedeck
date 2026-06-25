@@ -42,6 +42,20 @@ export interface RuntimeConfig {
     /** Window as ms (number) or an `ms`-style string (e.g. "1 minute"). */
     timeWindow: number | string;
   };
+  /** Brute-force throttle for sensitive auth endpoints (env `AUTH_RATE_*`). */
+  auth: {
+    /** Max attempts per window, per client IP. */
+    max: number;
+    /** Window as ms (number) or an `ms`-style string (e.g. "1 minute"). */
+    timeWindow: number | string;
+  };
+  /**
+   * Fastify `trustProxy` value (env `TRUST_PROXY`). `false` (default) trusts no
+   * forwarded headers; a number trusts that many proxy hops; a string is an
+   * IP/CIDR. Must be set behind a reverse proxy for IP-keyed limits + real
+   * client IPs in logs.
+   */
+  trustProxy: boolean | number | string;
   /** Transactional email config (env `EMAIL_*`). Provider unset → console no-op. */
   email: {
     /** Logical provider name; unset in OSS (console no-op). Cloud binds a real one. */
@@ -81,6 +95,9 @@ export type RuntimeConfigEnv = Partial<
     | 'BILLING_ENABLED'
     | 'INGEST_RATE_LIMIT'
     | 'INGEST_RATE_WINDOW'
+    | 'AUTH_RATE_LIMIT'
+    | 'AUTH_RATE_WINDOW'
+    | 'TRUST_PROXY'
     | 'EMAIL_PROVIDER'
     | 'EMAIL_FROM'
     | 'WEBHOOK_POLL_INTERVAL_MS'
@@ -93,14 +110,30 @@ export type RuntimeConfigEnv = Partial<
 
 /** Default per-source ingestion rate limit when env is unset. */
 const DEFAULT_INGEST_MAX = 120;
-const DEFAULT_INGEST_WINDOW_MS = 60_000;
+const DEFAULT_WINDOW_MS = 60_000;
+/** Default sensitive-auth attempts per window when env is unset. */
+const DEFAULT_AUTH_MAX = 20;
 
-/** Resolve the ingest window: a numeric string → ms number, else the raw string. */
-function resolveIngestWindow(raw: string | undefined): number | string {
+/** Resolve a rate-limit window: a numeric string → ms number, else the raw string. */
+function resolveWindow(raw: string | undefined): number | string {
   const trimmed = raw?.trim();
-  if (!trimmed) return DEFAULT_INGEST_WINDOW_MS;
+  if (!trimmed) return DEFAULT_WINDOW_MS;
   const asNumber = Number(trimmed);
   return Number.isFinite(asNumber) && asNumber > 0 ? asNumber : trimmed;
+}
+
+/**
+ * Resolve `TRUST_PROXY` to a Fastify `trustProxy` value: `true`/`false`, a hop
+ * count, or a literal IP/CIDR string. Unset/empty → `false` (trust nothing).
+ */
+function resolveTrustProxy(raw: string | undefined): boolean | number | string {
+  const trimmed = raw?.trim();
+  if (!trimmed) return false;
+  if (/^(true|yes|on)$/i.test(trimmed)) return true;
+  if (/^(false|no|off)$/i.test(trimmed)) return false;
+  const asNumber = Number(trimmed);
+  if (Number.isInteger(asNumber) && asNumber >= 0) return asNumber;
+  return trimmed; // IP / CIDR list, passed through to proxy-addr
 }
 
 /**
@@ -119,8 +152,13 @@ export function buildRuntimeConfig(env: RuntimeConfigEnv): RuntimeConfig {
     perAccountRetention: isCloud,
     ingest: {
       max: env.INGEST_RATE_LIMIT ?? DEFAULT_INGEST_MAX,
-      timeWindow: resolveIngestWindow(env.INGEST_RATE_WINDOW),
+      timeWindow: resolveWindow(env.INGEST_RATE_WINDOW),
     },
+    auth: {
+      max: env.AUTH_RATE_LIMIT ?? DEFAULT_AUTH_MAX,
+      timeWindow: resolveWindow(env.AUTH_RATE_WINDOW),
+    },
+    trustProxy: resolveTrustProxy(env.TRUST_PROXY),
     email: {
       provider: env.EMAIL_PROVIDER,
       from: env.EMAIL_FROM,

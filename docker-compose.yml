@@ -29,6 +29,14 @@ services:
       # Defaults to the local web origin; if you change WEB_PORT or front this
       # with a domain/HTTPS, set BETTER_AUTH_URL=https://your.domain accordingly.
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      # Trust the bundled nginx as one proxy hop so `request.ip` is the real
+      # client (needed for the IP-keyed auth/ingest rate limits and real client
+      # IPs in logs). Increase if you add another LB/proxy in front.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Optional: point the rate limiters (and SSE fan-out) at Redis so limits
+      # hold ACROSS replicas. Unset → per-node in-memory limiting. Start Redis
+      # with `--profile realtime` and set e.g. redis://redis:6379.
+      REDIS_URL: ${REDIS_URL:-}
       # Report retention: 0 = keep forever (default). Set >0 to purge reports
       # older than N days; the sweep is single-run across replicas (advisory lock).
       RETENTION_DAYS: ${RETENTION_DAYS:-0}

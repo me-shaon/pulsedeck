@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { useReportMutations } from '@/hooks/use-report-mutations';
 
+type Pending = 'toggle' | 'delete' | null;
+
 /**
  * Floating toolbar shown while one or more reports are selected. Offers
  * archive/unarchive (the primary action flips by the current view's scope) and
- * hard-delete (behind a confirm dialog, since it is irreversible). Clears the
- * selection on success and surfaces the affected count via a toast.
+ * hard-delete. Both actions require an explicit confirmation dialog before
+ * running. Clears the selection on success and reports the affected count.
  */
 export function BulkActionBar({
   wsId,
@@ -25,13 +27,14 @@ export function BulkActionBar({
   onClear: () => void;
 }) {
   const { archive, unarchive, remove } = useReportMutations(wsId);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pending, setPending] = useState<Pending>(null);
   const count = ids.length;
   const noun = count === 1 ? 'report' : 'reports';
   const busy = archive.isPending || unarchive.isPending || remove.isPending;
   const inArchivedView = scope === 'archived';
+  const toggleVerb = inArchivedView ? 'unarchive' : 'archive';
 
-  async function runArchiveToggle() {
+  async function runToggle() {
     const mutation = inArchivedView ? unarchive : archive;
     const res = await mutation.mutateAsync(ids);
     toast.success(`${res.affected} ${noun} ${inArchivedView ? 'unarchived' : 'archived'}`);
@@ -44,16 +47,26 @@ export function BulkActionBar({
     onClear();
   }
 
+  // The confirm dialog is shared; its copy + handler derive from `pending`.
+  const isDelete = pending === 'delete';
+  const confirm = {
+    title: isDelete
+      ? `Delete ${count} ${noun}?`
+      : `${inArchivedView ? 'Unarchive' : 'Archive'} ${count} ${noun}?`,
+    description: isDelete
+      ? 'This permanently removes the selected reports. This cannot be undone.'
+      : inArchivedView
+        ? 'They will return to the active feed.'
+        : 'They will be hidden from the active feed. You can unarchive them later.',
+    confirmLabel: isDelete ? 'Delete' : inArchivedView ? 'Unarchive' : 'Archive',
+    confirmVariant: isDelete ? ('destructive' as const) : ('secondary' as const),
+  };
+
   return (
     <div className="sticky top-2 z-10 mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/95 px-3 py-2 shadow-lg backdrop-blur">
       <span className="text-xs font-medium text-foreground">{count} selected</span>
       <div className="flex items-center gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void runArchiveToggle().catch(() => toast.error('Action failed'))}
-          disabled={busy}
-        >
+        <Button variant="outline" size="sm" onClick={() => setPending('toggle')} disabled={busy}>
           {inArchivedView ? (
             <>
               <ArchiveRestore className="mr-1" /> Unarchive
@@ -67,7 +80,7 @@ export function BulkActionBar({
         <Button
           variant="destructive"
           size="sm"
-          onClick={() => setConfirmDelete(true)}
+          onClick={() => setPending('delete')}
           disabled={busy}
         >
           <Trash2 className="mr-1" /> Delete
@@ -84,16 +97,19 @@ export function BulkActionBar({
       </div>
 
       <ConfirmDialog
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title={`Delete ${count} ${noun}?`}
-        description="This permanently removes the selected reports. This cannot be undone."
-        confirmLabel="Delete"
+        open={pending !== null}
+        onOpenChange={(open) => {
+          if (!open) setPending(null);
+        }}
+        title={confirm.title}
+        description={confirm.description}
+        confirmLabel={confirm.confirmLabel}
+        confirmVariant={confirm.confirmVariant}
         onConfirm={async () => {
           try {
-            await runDelete();
+            await (isDelete ? runDelete() : runToggle());
           } catch {
-            toast.error('Delete failed');
+            toast.error(`Failed to ${isDelete ? 'delete' : toggleVerb}`);
           }
         }}
       />

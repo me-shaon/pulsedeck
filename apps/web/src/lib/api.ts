@@ -363,6 +363,24 @@ export const reorderStreams = (wsId: string, categoryId: string, ids: string[]) 
     body: { ids },
   });
 
+/** Active vs. archived report counts for the current filters (drives the tabs). */
+export const getReportCounts = (wsId: string, filters: ReportFilters = {}, signal?: AbortSignal) =>
+  request<{ active: number; archived: number }>(`/workspaces/${wsId}/reports/counts`, {
+    query: filterQuery(filters),
+    signal,
+  });
+
+export const getStreamReportCounts = (
+  wsId: string,
+  streamId: string,
+  filters: ReportFilters = {},
+  signal?: AbortSignal,
+) =>
+  request<{ active: number; archived: number }>(
+    `/workspaces/${wsId}/streams/${streamId}/reports/counts`,
+    { query: filterQuery(filters), signal },
+  );
+
 // --- Report mutations (bulk archive / unarchive / hard-delete) -----------
 
 /** Archive the given reports (hide from the default feed; reversible). */

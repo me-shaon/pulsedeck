@@ -42,6 +42,7 @@ export function ReportList({
   emptyDescription?: string;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const selectable = canManage && wsId !== undefined;
 
   const reports = useMemo(
@@ -56,6 +57,10 @@ export function ReportList({
     () => [...selected].filter((id) => visibleIds.has(id)),
     [selected, visibleIds],
   );
+  // Selection is "engaged" when the user explicitly entered selection mode OR
+  // has selected at least one row (e.g. via a hover-revealed checkbox). Engaged →
+  // every row paints its checkbox and the action bar shows.
+  const selectionActive = selectable && (selectionMode || selectedVisible.length > 0);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -65,11 +70,13 @@ export function ReportList({
       return next;
     });
   }
-  function clear() {
-    setSelected(new Set());
-  }
   function selectAllVisible() {
     setSelected(new Set(visibleIds));
+  }
+  // Exit selection mode entirely: drop the selection and the mode flag.
+  function exitSelection() {
+    setSelected(new Set());
+    setSelectionMode(false);
   }
 
   if (query.isPending) return <SkeletonRows rows={6} />;
@@ -81,14 +88,21 @@ export function ReportList({
 
   return (
     <div className="flex flex-col gap-2">
-      {selectable && selectedVisible.length > 0 ? (
-        <BulkActionBar wsId={wsId} ids={selectedVisible} scope={scope} onClear={clear} />
-      ) : null}
-
-      {selectable && selectedVisible.length === 0 ? (
+      {selectionActive ? (
+        <BulkActionBar
+          wsId={wsId}
+          ids={selectedVisible}
+          scope={scope}
+          visibleCount={reports.length}
+          onSelectAll={selectAllVisible}
+          onExit={exitSelection}
+        />
+      ) : selectable ? (
+        // Universal entry into selection mode (works on touch + keyboard); on
+        // hover-capable devices the per-row checkbox is a faster shortcut.
         <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={selectAllVisible}>
-            <CheckSquare className="mr-1" /> Select all
+          <Button variant="ghost" size="sm" onClick={() => setSelectionMode(true)}>
+            <CheckSquare className="mr-1" /> Select
           </Button>
         </div>
       ) : null}
@@ -105,6 +119,7 @@ export function ReportList({
             report={report}
             selectable={selectable}
             selected={selected.has(report.id)}
+            selectionActive={selectionActive}
             onToggleSelect={toggle}
           />
         ))}

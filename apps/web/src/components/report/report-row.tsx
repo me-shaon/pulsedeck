@@ -5,23 +5,32 @@ import { Badge } from '@/components/ui/badge';
 import { Mono } from '@/components/ui/mono';
 import { RelativeTime } from '@/components/common/relative-time';
 import { severityVariant, titleCase } from '@/lib/domain';
+import { cn } from '@/lib/utils';
 
 /**
  * A single report in a feed. The whole card links to the permalink. When
- * `selectable` is set (bulk archive/delete mode), a checkbox is rendered to the
- * left of the card — outside the `Link` so toggling never triggers navigation.
+ * `selectable` is set (the user may archive/delete), a checkbox sits to the left
+ * of the card — outside the `Link` so toggling never navigates.
+ *
+ * The checkbox is only painted when selection is engaged: it reveals on row
+ * hover (desktop accelerator) and on keyboard focus, and is shown for every row
+ * once `selectionActive` (the user entered selection mode or selected a row).
+ * Its narrow gutter is always reserved so revealing it never shifts the layout.
  */
 export function ReportRow({
   ws,
   report,
   selectable = false,
   selected = false,
+  selectionActive = false,
   onToggleSelect,
 }: {
   ws: string;
   report: ReportSummary;
   selectable?: boolean;
   selected?: boolean;
+  /** When true, every row's checkbox is painted (selection mode / a row is selected). */
+  selectionActive?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
   const card = (
@@ -80,8 +89,15 @@ export function ReportRow({
   if (!selectable) return card;
 
   return (
-    <div className="flex items-stretch gap-2.5">
-      <label className="flex shrink-0 items-center pl-1">
+    <div className="group/row flex items-stretch gap-2">
+      <label
+        className={cn(
+          'flex w-5 shrink-0 cursor-pointer items-center justify-center transition-opacity',
+          selectionActive || selected
+            ? 'opacity-100'
+            : 'opacity-0 focus-within:opacity-100 group-hover/row:opacity-100',
+        )}
+      >
         <input
           type="checkbox"
           checked={selected}

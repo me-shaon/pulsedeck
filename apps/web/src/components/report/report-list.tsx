@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState, SkeletonRows } from '@/components/common/states';
 import { BulkActionBar } from './bulk-action-bar';
 import { ReportRow } from './report-row';
+import { ScopeTabs } from './scope-tabs';
 
 // pageParam is `unknown` to match what `useInfiniteQuery` infers for the shared
 // feed hook (the cursor type isn't surfaced through the result generic).
@@ -17,9 +18,10 @@ type Query = UseInfiniteQueryResult<InfiniteData<ReportPage, unknown>, Error>;
  * per-stream feed, and Search from one infinite query — handling loading,
  * empty, and error states plus cursor-based "Load more".
  *
- * When `wsId` and `canManage` are supplied, each row becomes selectable and a
- * bulk action bar (archive/unarchive/delete) appears while any are selected.
- * `scope` tells the bar whether the primary action is Archive or Unarchive.
+ * It also owns the single header band above the feed: on the left the
+ * Active/Archived scope tabs, on the right the Select entry. Entering selection
+ * mode morphs that whole band into the bulk action bar. Keeping both halves in
+ * one component is what keeps the row aligned and the rhythm coherent.
  */
 export function ReportList({
   ws,
@@ -27,6 +29,8 @@ export function ReportList({
   wsId,
   canManage = false,
   scope = 'active',
+  counts,
+  onScopeChange,
   emptyTitle = 'No reports yet',
   emptyDescription = 'Reports pushed by your connected agents will appear here, newest first.',
 }: {
@@ -38,12 +42,17 @@ export function ReportList({
   canManage?: boolean;
   /** The list's archive scope, so the bar shows Archive vs. Unarchive. */
   scope?: ArchiveScope;
+  /** Active/archived counts for the scope tabs. Omit to hide the tabs. */
+  counts?: { active: number; archived: number };
+  /** Change the archive scope (drives the tabs). Omit to hide the tabs. */
+  onScopeChange?: (scope: ArchiveScope | undefined) => void;
   emptyTitle?: string;
   emptyDescription?: string;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const selectable = canManage && wsId !== undefined;
+  const showTabs = onScopeChange !== undefined;
 
   const reports = useMemo(
     () => (query.data ? query.data.pages.flatMap((p) => p.reports) : []),
@@ -57,9 +66,8 @@ export function ReportList({
     () => [...selected].filter((id) => visibleIds.has(id)),
     [selected, visibleIds],
   );
-  // Selection is "engaged" when the user explicitly entered selection mode OR
-  // has selected at least one row (e.g. via a hover-revealed checkbox). Engaged →
-  // every row paints its checkbox and the action bar shows.
+  // Selection is "engaged" once the user enters selection mode (the Select
+  // button). Only then do rows show a checkbox — the reading view stays flush.
   const selectionActive = selectable && (selectionMode || selectedVisible.length > 0);
 
   function toggle(id: string) {
@@ -82,64 +90,77 @@ export function ReportList({
   if (query.isPending) return <SkeletonRows rows={6} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
 
-  if (reports.length === 0) {
-    return <EmptyState icon={Inbox} title={emptyTitle} description={emptyDescription} />;
-  }
+  // The header band morphs: tabs + Select while reading, the action bar while
+  // selecting. Rendered even on an empty feed so the tabs (and their counts)
+  // never disappear when a filter or scope yields nothing.
+  const header = selectionActive ? (
+    <BulkActionBar
+      wsId={wsId!}
+      ids={selectedVisible}
+      scope={scope}
+      visibleCount={reports.length}
+      onSelectAll={selectAllVisible}
+      onExit={exitSelection}
+    />
+  ) : showTabs || selectable ? (
+    <div className="flex items-center justify-between gap-3">
+      {showTabs ? <ScopeTabs scope={scope} counts={counts} onChange={onScopeChange} /> : <span />}
+      {selectable ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => setSelectionMode(true)}
+        >
+          <CheckSquare className="mr-1" /> Select
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
-    <div className="flex flex-col gap-2">
-      {selectionActive ? (
-        <BulkActionBar
-          wsId={wsId}
-          ids={selectedVisible}
-          scope={scope}
-          visibleCount={reports.length}
-          onSelectAll={selectAllVisible}
-          onExit={exitSelection}
-        />
-      ) : selectable ? (
-        // Universal entry into selection mode (works on touch + keyboard); on
-        // hover-capable devices the per-row checkbox is a faster shortcut.
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setSelectionMode(true)}>
-            <CheckSquare className="mr-1" /> Select
-          </Button>
-        </div>
-      ) : null}
+    <div className="flex flex-col gap-4">
+      {header}
 
-      {/* aria-busy reflects a background refetch (poll) without blocking reads. */}
-      <div
-        className="flex flex-col gap-3"
-        aria-busy={query.isFetching && !query.isFetchingNextPage}
-      >
-        {reports.map((report) => (
-          <ReportRow
-            key={report.id}
-            ws={ws}
-            report={report}
-            selectable={selectable}
-            selected={selected.has(report.id)}
-            selectionActive={selectionActive}
-            onToggleSelect={toggle}
-          />
-        ))}
-      </div>
-
-      {query.hasNextPage ? (
-        <div className="flex justify-center py-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => query.fetchNextPage()}
-            disabled={query.isFetchingNextPage}
-          >
-            {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
-          </Button>
-        </div>
+      {reports.length === 0 ? (
+        <EmptyState icon={Inbox} title={emptyTitle} description={emptyDescription} />
       ) : (
-        <p className="py-2 text-center text-[0.6875rem] text-muted-foreground">
-          {reports.length} report{reports.length === 1 ? '' : 's'} · end of feed
-        </p>
+        <>
+          {/* aria-busy reflects a background refetch (poll) without blocking reads. */}
+          <div
+            className="flex flex-col gap-3"
+            aria-busy={query.isFetching && !query.isFetchingNextPage}
+          >
+            {reports.map((report) => (
+              <ReportRow
+                key={report.id}
+                ws={ws}
+                report={report}
+                selectable={selectable}
+                selected={selected.has(report.id)}
+                selectionActive={selectionActive}
+                onToggleSelect={toggle}
+              />
+            ))}
+          </div>
+
+          {query.hasNextPage ? (
+            <div className="flex justify-center py-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => query.fetchNextPage()}
+                disabled={query.isFetchingNextPage}
+              >
+                {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              </Button>
+            </div>
+          ) : (
+            <p className="py-1 text-center text-[0.6875rem] text-muted-foreground">
+              {reports.length} report{reports.length === 1 ? '' : 's'} · end of feed
+            </p>
+          )}
+        </>
       )}
     </div>
   );

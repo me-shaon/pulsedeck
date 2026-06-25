@@ -39,7 +39,9 @@ export function ScopeTabs({
             onClick={() => onChange(tab.key === 'active' ? undefined : 'archived')}
             className={cn(
               'flex h-7 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              active ? 'bg-brand-tint text-brand' : 'text-muted-foreground hover:text-foreground',
+              active
+                ? 'bg-brand-tint text-brand shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {tab.label}
@@ -47,7 +49,7 @@ export function ScopeTabs({
               <span
                 className={cn(
                   'rounded-full px-1.5 text-[0.625rem] tabular-nums',
-                  active ? 'bg-brand/15 text-brand' : 'bg-surface-2 text-muted-foreground',
+                  active ? 'bg-brand/20 text-brand' : 'bg-surface-2 text-muted-foreground',
                 )}
               >
                 {tab.count}

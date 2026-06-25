@@ -6,7 +6,6 @@ import { useReportCounts } from '@/hooks/use-report-counts';
 import { useSources, useTree } from '@/hooks/use-workspace-data';
 import { ReportList } from '@/components/report/report-list';
 import { ReportFiltersBar } from '@/components/report/report-filters';
-import { ScopeTabs } from '@/components/report/scope-tabs';
 import { PageContainer, PageHeader } from '@/components/common/page';
 
 const route = getRouteApi('/w/$ws/search');
@@ -40,20 +39,15 @@ export function SearchPage() {
           tree={tree.data}
         />
       </div>
-      <div className="mb-3">
-        <ScopeTabs
-          scope={filters.archived ?? 'active'}
-          counts={counts.data}
-          onChange={(archived) =>
-            navigate({ search: filtersToSearch({ ...filters, archived }), replace: true })
-          }
-        />
-      </div>
       <ReportList
         ws={workspace.slug}
         wsId={workspace.id}
         canManage={canManageReports(role)}
         scope={filters.archived ?? 'active'}
+        counts={counts.data}
+        onScopeChange={(archived) =>
+          navigate({ search: filtersToSearch({ ...filters, archived }), replace: true })
+        }
         query={query}
         emptyTitle="No matching reports"
         emptyDescription="Try a different search term or relax the filters."

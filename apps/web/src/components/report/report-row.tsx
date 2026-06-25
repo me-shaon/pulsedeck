@@ -37,7 +37,10 @@ export function ReportRow({
     <Link
       to="/w/$ws/r/$reportId"
       params={{ ws, reportId: report.id }}
-      className="group flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface px-4 py-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        'group flex flex-1 flex-col gap-2 rounded-lg border bg-surface px-4 py-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        selected ? 'border-brand bg-brand-tint/40' : 'border-border',
+      )}
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="min-w-0 truncate text-sm font-semibold tracking-tight text-foreground group-hover:text-foreground">
@@ -86,18 +89,13 @@ export function ReportRow({
     </Link>
   );
 
-  if (!selectable) return card;
+  // Reading view stays flush — the checkbox (and its gutter) appear only once
+  // the user is in selection mode, so there is never dead space on the left.
+  if (!selectable || !selectionActive) return card;
 
   return (
-    <div className="group/row flex items-stretch gap-2">
-      <label
-        className={cn(
-          'flex w-5 shrink-0 cursor-pointer items-center justify-center transition-opacity',
-          selectionActive || selected
-            ? 'opacity-100'
-            : 'opacity-0 focus-within:opacity-100 group-hover/row:opacity-100',
-        )}
-      >
+    <div className="flex items-stretch gap-3">
+      <label className="flex shrink-0 cursor-pointer items-center">
         <input
           type="checkbox"
           checked={selected}

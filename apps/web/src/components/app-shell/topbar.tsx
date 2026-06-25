@@ -28,7 +28,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const initial = workspace.name.charAt(0).toUpperCase();
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-3 sm:px-4 lg:px-10">
+    <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-3 sm:px-4 lg:px-12">
       <Button
         variant="ghost"
         size="icon"

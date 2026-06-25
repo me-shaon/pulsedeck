@@ -21,12 +21,18 @@ export interface ReportMutationResult {
   affected: number;
   /** Distinct streams that had at least one report changed. */
   streamIds: string[];
+  /** Ids of the reports actually changed (drives the realtime event payload). */
+  reportIds: string[];
 }
 
-const EMPTY: ReportMutationResult = { affected: 0, streamIds: [] };
+const EMPTY: ReportMutationResult = { affected: 0, streamIds: [], reportIds: [] };
 
-function summarize(rows: { streamId: string }[]): ReportMutationResult {
-  return { affected: rows.length, streamIds: [...new Set(rows.map((r) => r.streamId))] };
+function summarize(rows: { id: string; streamId: string }[]): ReportMutationResult {
+  return {
+    affected: rows.length,
+    streamIds: [...new Set(rows.map((r) => r.streamId))],
+    reportIds: rows.map((r) => r.id),
+  };
 }
 
 /**
@@ -50,7 +56,7 @@ export async function archiveReports(
         isNull(reports.archivedAt),
       ),
     )
-    .returning({ streamId: reports.streamId });
+    .returning({ id: reports.id, streamId: reports.streamId });
   return summarize(rows);
 }
 
@@ -74,7 +80,7 @@ export async function unarchiveReports(
         isNotNull(reports.archivedAt),
       ),
     )
-    .returning({ streamId: reports.streamId });
+    .returning({ id: reports.id, streamId: reports.streamId });
   return summarize(rows);
 }
 
@@ -92,6 +98,6 @@ export async function deleteReports(
   const rows = await db
     .delete(reports)
     .where(and(eq(reports.workspaceId, workspaceId), inArray(reports.id, ids)))
-    .returning({ streamId: reports.streamId });
+    .returning({ id: reports.id, streamId: reports.streamId });
   return summarize(rows);
 }

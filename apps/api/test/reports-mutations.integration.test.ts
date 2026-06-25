@@ -198,7 +198,11 @@ describeIfDb('report mutations service (integration)', () => {
   });
 
   it('empty ids short-circuit to zero', async () => {
-    expect(await archiveReports(db, ws1, [])).toEqual({ affected: 0, streamIds: [] });
-    expect(await deleteReports(db, ws1, [])).toEqual({ affected: 0, streamIds: [] });
+    expect(await archiveReports(db, ws1, [])).toEqual({
+      affected: 0,
+      streamIds: [],
+      reportIds: [],
+    });
+    expect(await deleteReports(db, ws1, [])).toEqual({ affected: 0, streamIds: [], reportIds: [] });
   });
 });

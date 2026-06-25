@@ -171,12 +171,16 @@ describeIfDb('reports read APIs (integration)', () => {
     sourceId = id('src');
     await db.insert(sources).values({ id: sourceId, workspaceId, name: 'Seed Agent' });
 
-    // Categories (engineering pos 0, marketing pos 1).
+    // Categories (engineering pos 0, marketing pos 1, archive pos 2). The
+    // archive category isolates the archive-scope fixtures so they don't pollute
+    // the engineering/marketing filter assertions.
     const cEng = id('cat');
     const cMkt = id('cat');
+    const cArchive = id('cat');
     await db.insert(categories).values([
       { id: cEng, workspaceId, name: 'Engineering', slug: 'engineering', position: 0 },
       { id: cMkt, workspaceId, name: 'Marketing', slug: 'marketing', position: 1 },
+      { id: cArchive, workspaceId, name: 'Archive', slug: 'archive', position: 2 },
     ]);
 
     // Streams.
@@ -192,7 +196,7 @@ describeIfDb('reports read APIs (integration)', () => {
       { id: stPage, categoryId: cEng, name: 'Page', slug: 'page', position: 2 },
       { id: stSeo, categoryId: cMkt, name: 'Seo', slug: 'seo', position: 0 },
       { id: stEmpty, categoryId: cMkt, name: 'Empty', slug: 'empty', position: 1 },
-      { id: stArchive, categoryId: cMkt, name: 'Archive', slug: 'archive', position: 2 },
+      { id: stArchive, categoryId: cArchive, name: 'Archive', slug: 'archive', position: 0 },
     ]);
 
     // Main reports in stDeploys (oldest → newest).
@@ -568,7 +572,11 @@ describeIfDb('reports read APIs (integration)', () => {
     const res = await get(`/api/v1/workspaces/${workspaceId}/tree`);
     expect(res.statusCode).toBe(200);
     const cats = res.json().categories;
-    expect(cats.map((c: { slug: string }) => c.slug)).toEqual(['engineering', 'marketing']);
+    expect(cats.map((c: { slug: string }) => c.slug)).toEqual([
+      'engineering',
+      'marketing',
+      'archive',
+    ]);
 
     const eng = cats[0];
     // Created via agent autocreate → label_source is 'auto'.

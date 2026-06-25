@@ -13,6 +13,7 @@ import { dashboardRoutes } from './routes/dashboards.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes } from './routes/health.js';
 import { reportReadRoutes } from './routes/reports-read.js';
+import { reportsWriteRoutes } from './routes/reports-write.js';
 import { reportRoutes } from './routes/reports.js';
 import { sourceRoutes } from './routes/sources.js';
 import { structureRoutes } from './routes/structure.js';
@@ -281,6 +282,7 @@ export function buildServer({
   app.register(structureRoutes);
   app.register(reportRoutes);
   app.register(reportReadRoutes);
+  app.register(reportsWriteRoutes);
   app.register(dashboardRoutes);
   app.register(eventRoutes);
   app.register(webhookRoutes);

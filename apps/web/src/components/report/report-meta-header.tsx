@@ -43,12 +43,12 @@ export function ReportMetaHeader({
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
           {report.title}
         </h1>
         {report.severity ? (
-          <Badge variant={severityVariant(report.severity)} dot className="mt-1 shrink-0">
+          <Badge variant={severityVariant(report.severity)} dot className="shrink-0">
             {titleCase(report.severity)}
           </Badge>
         ) : null}

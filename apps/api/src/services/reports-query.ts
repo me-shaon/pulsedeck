@@ -363,6 +363,35 @@ export async function listReports(
   return { reports: visible.map(toSummary), nextCursor };
 }
 
+/**
+ * Active vs. archived report counts for the current filter set, driving the
+ * Active/Archived tabs. The archive scope itself is ignored (forced to `all`) so
+ * both counts reflect the SAME other filters — severity, source, tags, date,
+ * search — and a single grouped `count(*) FILTER` returns both in one round-trip.
+ */
+export async function countReports(
+  db: Db,
+  opts: { workspaceId: string; streamId?: string; params: ListParams },
+): Promise<{ active: number; archived: number }> {
+  const { workspaceId, streamId, params } = opts;
+  // Drop the archive condition (count both) and the keyset cursor (count all).
+  const countParams: ListParams = { ...params, archived: 'all', cursor: null };
+  const [row] = (await db
+    .select({
+      active: sql<number>`count(*) filter (where ${reports.archivedAt} is null)::int`,
+      archived: sql<number>`count(*) filter (where ${reports.archivedAt} is not null)::int`,
+    })
+    .from(reports)
+    .innerJoin(streams, eq(streams.id, reports.streamId))
+    .innerJoin(categories, eq(categories.id, streams.categoryId))
+    .innerJoin(sources, eq(sources.id, reports.sourceId))
+    .where(and(...listConditions(workspaceId, streamId, countParams)))) as unknown as Array<{
+    active: number;
+    archived: number;
+  }>;
+  return { active: row?.active ?? 0, archived: row?.archived ?? 0 };
+}
+
 /** True when `streamId` belongs to `workspaceId` (else the caller 404s). */
 export async function streamInWorkspace(
   db: Db,
@@ -567,7 +596,9 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
     })
     .from(streams)
     .innerJoin(categories, eq(categories.id, streams.categoryId))
-    .leftJoin(reports, eq(reports.streamId, streams.id))
+    // Count/most-recent over ACTIVE reports only (archived_at IS NULL) so the
+    // sidebar badge and stream header match the Active tab, not the total.
+    .leftJoin(reports, and(eq(reports.streamId, streams.id), isNull(reports.archivedAt)))
     .where(eq(categories.workspaceId, workspaceId))
     .groupBy(streams.id)
     .orderBy(asc(streams.position), asc(streams.name))) as unknown as Array<{

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { makeRequireAuth, makeRequireWorkspaceRole } from '../auth/fastify.js';
 import {
+  countReports,
   getReportDetail,
   getTree,
   listReports,
@@ -38,6 +39,37 @@ export async function reportReadRoutes(app: FastifyInstance): Promise<void> {
     const result = await listReports(db, { workspaceId, params: parsed.value });
     return reply.send(result);
   });
+
+  // --- Active/archived counts for the current filter set (drives the tabs) ---
+  // Registered before `/:reportId` so the static `/counts` segment wins the match.
+  app.get(
+    '/api/v1/workspaces/:id/reports/counts',
+    { preHandler: viewGate },
+    async (request, reply) => {
+      const { id: workspaceId } = request.params as { id: string };
+      const parsed = parseListQuery(request.query as Record<string, unknown>);
+      if (!parsed.ok) {
+        return reply.code(400).send({ error: 'invalid_query', message: parsed.message });
+      }
+      return reply.send(await countReports(db, { workspaceId, params: parsed.value }));
+    },
+  );
+
+  app.get(
+    '/api/v1/workspaces/:id/streams/:streamId/reports/counts',
+    { preHandler: viewGate },
+    async (request, reply) => {
+      const { id: workspaceId, streamId } = request.params as { id: string; streamId: string };
+      if (!(await streamInWorkspace(db, workspaceId, streamId))) {
+        return reply.code(404).send({ error: 'Stream not found' });
+      }
+      const parsed = parseListQuery(request.query as Record<string, unknown>);
+      if (!parsed.ok) {
+        return reply.code(400).send({ error: 'invalid_query', message: parsed.message });
+      }
+      return reply.send(await countReports(db, { workspaceId, streamId, params: parsed.value }));
+    },
+  );
 
   // --- Stream feed (same shape/pagination/filters, scoped to one stream) -----
   app.get(

@@ -527,6 +527,33 @@ describeIfDb('reports read APIs (integration)', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('counts endpoint returns active/archived totals respecting other filters', async () => {
+    // Workspace-wide: exactly one archived report seeded; active count is >= 11
+    // (another test may seed an extra active "intruder" report earlier in the run).
+    const ws = await get(`/api/v1/workspaces/${workspaceId}/reports/counts`);
+    expect(ws.statusCode).toBe(200);
+    expect(ws.json().archived).toBe(1);
+    expect(ws.json().active).toBeGreaterThanOrEqual(11);
+
+    // Stream-scoped to the archive stream: 1 active + 1 archived.
+    const stream = await get(
+      `/api/v1/workspaces/${workspaceId}/streams/${stArchive}/reports/counts`,
+    );
+    expect(stream.json()).toEqual({ active: 1, archived: 1 });
+
+    // Counts honor other filters: searching "archivable" still splits by scope.
+    const filtered = await get(`/api/v1/workspaces/${workspaceId}/reports/counts?q=archivable`);
+    expect(filtered.json()).toEqual({ active: 1, archived: 1 });
+  });
+
+  it('tree report counts are active-only (archived excluded from the badge)', async () => {
+    const res = await get(`/api/v1/workspaces/${workspaceId}/tree`);
+    const archiveCat = res.json().categories.find((c: { slug: string }) => c.slug === 'archive');
+    const archiveStream = archiveCat.streams.find((s: { slug: string }) => s.slug === 'archive');
+    // 1 active + 1 archived seeded → badge counts the active one only.
+    expect(archiveStream.reportCount).toBe(1);
+  });
+
   // --- Stream scoping --------------------------------------------------------
 
   it('a foreign stream → 404', async () => {

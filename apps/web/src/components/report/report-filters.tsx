@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import type { Severity } from '@pulsedeck/schema';
-import type { ReportFilters, Source, Tree } from '@/lib/api-types';
+import type { ArchiveScope, ReportFilters, Source, Tree } from '@/lib/api-types';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -79,7 +79,8 @@ export function ReportFiltersBar({
     filters.stream ||
     filters.from ||
     filters.to ||
-    (filters.tags && filters.tags.length > 0),
+    (filters.tags && filters.tags.length > 0) ||
+    (filters.archived && filters.archived !== 'active'),
   );
 
   function set<K extends keyof ReportFilters>(key: K, value: ReportFilters[K]) {
@@ -121,6 +122,22 @@ export function ReportFiltersBar({
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
+        <FilterField label="Show">
+          <Select
+            value={filters.archived ?? 'active'}
+            onValueChange={(v) => set('archived', v === 'active' ? undefined : (v as ArchiveScope))}
+          >
+            <SelectTrigger className="w-36" aria-label="Archive scope">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="all">Include archived</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+
         <FilterField label="Severity">
           <div className="flex items-center gap-1" role="group" aria-label="Filter by severity">
             {SEVERITIES.map((s) => {

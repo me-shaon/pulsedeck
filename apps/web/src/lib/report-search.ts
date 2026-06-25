@@ -1,5 +1,5 @@
 import type { Severity } from '@pulsedeck/schema';
-import type { ReportFilters } from './api-types';
+import type { ArchiveScope, ReportFilters } from './api-types';
 
 /**
  * URL search-param schema for the report list + search routes. Filters live in
@@ -17,9 +17,20 @@ export interface ReportSearch {
   from?: string;
   to?: string;
   tags?: string;
+  /** Archive scope; absent = the default `active` feed. */
+  archived?: ArchiveScope;
 }
 
 const SEVERITIES: ReadonlyArray<Severity> = ['info', 'warning', 'critical'];
+const ARCHIVE_SCOPES: ReadonlyArray<ArchiveScope> = ['active', 'archived', 'all'];
+
+/** Coerce a raw param into an ArchiveScope; `active` (the default) maps to undefined. */
+function parseArchived(raw: unknown): ArchiveScope | undefined {
+  const v = typeof raw === 'string' ? raw : undefined;
+  return v && v !== 'active' && ARCHIVE_SCOPES.includes(v as ArchiveScope)
+    ? (v as ArchiveScope)
+    : undefined;
+}
 
 function str(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -50,6 +61,7 @@ export function validateReportSearch(raw: Record<string, unknown>): ReportSearch
     from: str(raw.from),
     to: str(raw.to),
     tags: str(raw.tags),
+    archived: parseArchived(raw.archived),
   };
 }
 
@@ -69,6 +81,7 @@ export function searchToFilters(search: ReportSearch): ReportFilters {
           .map((t) => t.trim())
           .filter(Boolean)
       : undefined,
+    archived: search.archived,
   };
 }
 
@@ -83,5 +96,6 @@ export function filtersToSearch(filters: ReportFilters): ReportSearch {
     from: filters.from || undefined,
     to: filters.to || undefined,
     tags: filters.tags && filters.tags.length ? filters.tags.join(',') : undefined,
+    archived: filters.archived && filters.archived !== 'active' ? filters.archived : undefined,
   };
 }

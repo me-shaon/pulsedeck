@@ -113,8 +113,8 @@ export function ReportFiltersBar({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <FilterField label="Severity">
+      <div className="flex flex-wrap items-end gap-2 lg:flex-nowrap">
+        <FilterField label="Severity" className="shrink-0">
           <div className="flex items-center gap-1" role="group" aria-label="Filter by severity">
             {SEVERITIES.map((s) => {
               const active = (filters.severity ?? []).includes(s);
@@ -143,12 +143,12 @@ export function ReportFiltersBar({
         </FilterField>
 
         {sources && sources.length > 0 ? (
-          <FilterField label="Source">
+          <FilterField label="Source" className="min-w-[8rem] lg:flex-1">
             <Select
               value={filters.source ?? ALL}
               onValueChange={(v) => set('source', v === ALL ? undefined : v)}
             >
-              <SelectTrigger className="w-40" aria-label="Filter by source">
+              <SelectTrigger className="w-full" aria-label="Filter by source">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -165,7 +165,7 @@ export function ReportFiltersBar({
 
         {!hideStreamFilter && tree ? (
           <>
-            <FilterField label="Category">
+            <FilterField label="Category" className="min-w-[8rem] lg:flex-1">
               <Select
                 value={filters.category ?? ALL}
                 onValueChange={(v) =>
@@ -176,7 +176,7 @@ export function ReportFiltersBar({
                   })
                 }
               >
-                <SelectTrigger className="w-40" aria-label="Filter by category">
+                <SelectTrigger className="w-full" aria-label="Filter by category">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,12 +190,12 @@ export function ReportFiltersBar({
               </Select>
             </FilterField>
 
-            <FilterField label="Stream">
+            <FilterField label="Stream" className="min-w-[8rem] lg:flex-1">
               <Select
                 value={filters.stream ?? ALL}
                 onValueChange={(v) => set('stream', v === ALL ? undefined : v)}
               >
-                <SelectTrigger className="w-40" aria-label="Filter by stream">
+                <SelectTrigger className="w-full" aria-label="Filter by stream">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -211,33 +211,39 @@ export function ReportFiltersBar({
           </>
         ) : null}
 
-        <FilterField label="Date">
+        <FilterField label="Date" className="min-w-[8rem] lg:flex-1">
           <DateRangeField
             value={{ from: filters.from, to: filters.to }}
             onChange={(range) => onChange({ ...filters, from: range.from, to: range.to })}
           />
         </FilterField>
 
-        <FilterField label="Tags">
-          <div className="w-44">
-            <MultiSelect
-              options={(tags ?? []).map((t) => ({ value: t, label: t }))}
-              value={filters.tags ?? []}
-              onChange={(next) => set('tags', next.length ? next : undefined)}
-              ariaLabel="Filter by tags"
-              placeholder="Search tags…"
-              emptyLabel="All tags"
-            />
-          </div>
+        <FilterField label="Tags" className="min-w-[8rem] lg:flex-1">
+          <MultiSelect
+            options={(tags ?? []).map((t) => ({ value: t, label: t }))}
+            value={filters.tags ?? []}
+            onChange={(next) => set('tags', next.length ? next : undefined)}
+            ariaLabel="Filter by tags"
+            placeholder="Search tags…"
+            emptyLabel="All tags"
+          />
         </FilterField>
       </div>
     </div>
   );
 }
 
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
+function FilterField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <label className="flex flex-col gap-1">
+    <label className={cn('flex flex-col gap-1', className)}>
       <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>

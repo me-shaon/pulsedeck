@@ -88,7 +88,7 @@ export function DateRangeField({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex h-8 w-44 items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 text-xs transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 text-xs transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           hasValue ? 'text-foreground' : 'text-muted-foreground',
         )}
       >

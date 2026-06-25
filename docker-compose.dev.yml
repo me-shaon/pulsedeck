@@ -21,6 +21,10 @@ services:
     command: pnpm --filter @pulsedeck/api dev # tsx watch → reload on save
     restart: 'no'
     environment:
+      # Development posture: the API allows the local dev AUTH_SECRET dummy
+      # (overrides the inherited prod `NODE_ENV: production`). AUTH_SECRET itself
+      # still comes from .env (the prod compose's `${AUTH_SECRET:?…}` reads it).
+      NODE_ENV: development
       # Bind-mounted file events don't propagate natively on macOS/Windows;
       # polling makes tsx/chokidar see your edits.
       CHOKIDAR_USEPOLLING: 'true'

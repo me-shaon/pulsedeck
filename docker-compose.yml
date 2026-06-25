@@ -11,9 +11,15 @@ services:
     image: pulsedeck/api:latest
     restart: unless-stopped
     environment:
+      # Production posture: the API rejects known placeholder secrets when this
+      # is `production` (see apps/api/src/env.ts).
+      NODE_ENV: production
       DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
-      # Change this to a long random value (>=32 chars) before any real use.
-      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-secret-string}
+      # Session/token signing secret. NO default on purpose — boot aborts if it is
+      # unset so a deployment can never run on a known value. Provide it via .env
+      # (compose auto-loads it): run `make setup` to generate one, or set it to
+      # `openssl rand -base64 48`. To rotate: replace the value and restart the API.
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required — run `make setup` or set a 32+ char random value (openssl rand -base64 48)}
       # Public origin the browser uses to reach the app. better-auth builds OAuth
       # callbacks + validates request origins against this, so it MUST be the
       # public web origin (nginx, WEB_PORT) — not the API's internal port.

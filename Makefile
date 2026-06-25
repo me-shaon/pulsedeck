@@ -6,11 +6,15 @@
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs build dev dev-down dev-logs dev-fresh fresh db-reset ps clean
+.PHONY: help setup up down logs build dev dev-down dev-logs dev-fresh fresh db-reset ps clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+
+## ── Setup ───────────────────────────────────────────────────────────────────
+setup: ## Generate production secrets into .env (idempotent; safe to re-run)
+	./scripts/gen-secrets.sh
 
 ## ── Production ──────────────────────────────────────────────────────────────
 up: ## Build + start the production stack (detached)

@@ -2,6 +2,7 @@
 PRD.md
 BLOCK_SCHEMA.md
 IMPLEMENTATION_PLAN.md
+SECURITY-AUDIT.md
 
 # Dependencies
 node_modules/

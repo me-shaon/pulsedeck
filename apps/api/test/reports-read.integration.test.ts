@@ -80,6 +80,10 @@ describeIfDb('reports read APIs (integration)', () => {
   let stSeo: string;
   let stEmpty: string;
   let stPage: string;
+  // Archive-scope stream (marketing): one active + one archived report.
+  let stArchive: string;
+  let aActive: string;
+  let aArchived: string;
   // Key reports in stDeploys (oldest → newest: R1, R2, R3).
   let r1: string;
   let r2: string;
@@ -100,6 +104,8 @@ describeIfDb('reports read APIs (integration)', () => {
     source?: string;
     /** Owning workspace; defaults to ws1. Pass ws2 for the foreign-isolation seed. */
     workspaceId?: string;
+    /** When set, the report is seeded already-archived (for archive-scope tests). */
+    archivedAt?: Date | null;
   }): Promise<string> {
     const rid = id('rpt');
     const tags = opts.tags ?? [];
@@ -115,6 +121,7 @@ describeIfDb('reports read APIs (integration)', () => {
       severity: opts.severity ?? null,
       occurredAt: opts.receivedAt,
       receivedAt: opts.receivedAt,
+      archivedAt: opts.archivedAt ?? null,
       tags,
       blocks: mdBlocks(opts.blocks ?? 1),
       searchVector: sql`to_tsvector('english', ${opts.title} || ' ' || ${summary ?? ''} || ' ' || ${tags.join(' ')})`,
@@ -178,12 +185,14 @@ describeIfDb('reports read APIs (integration)', () => {
     stPage = id('stm');
     stSeo = id('stm');
     stEmpty = id('stm');
+    stArchive = id('stm');
     await db.insert(streams).values([
       { id: stDeploys, categoryId: cEng, name: 'Deploys', slug: 'deploys', position: 0 },
       { id: stInfra, categoryId: cEng, name: 'Infra', slug: 'infra', position: 1 },
       { id: stPage, categoryId: cEng, name: 'Page', slug: 'page', position: 2 },
       { id: stSeo, categoryId: cMkt, name: 'Seo', slug: 'seo', position: 0 },
       { id: stEmpty, categoryId: cMkt, name: 'Empty', slug: 'empty', position: 1 },
+      { id: stArchive, categoryId: cMkt, name: 'Archive', slug: 'archive', position: 2 },
     ]);
 
     // Main reports in stDeploys (oldest → newest).
@@ -231,6 +240,23 @@ describeIfDb('reports read APIs (integration)', () => {
       tags: ['seo'],
       receivedAt: new Date('2026-01-05T00:00:00Z'),
       blocks: 2,
+    });
+
+    // Archive-scope fixtures: one active + one archived report in stArchive.
+    // The archived one shares the searchable word "archivable" so a search can
+    // prove it surfaces under `archived=all` but not under the default feed.
+    aActive = await seedReport({
+      streamId: stArchive,
+      title: 'Active archivable report',
+      receivedAt: new Date('2026-01-06T00:00:00Z'),
+      blocks: 1,
+    });
+    aArchived = await seedReport({
+      streamId: stArchive,
+      title: 'Archived archivable report',
+      receivedAt: new Date('2026-01-07T00:00:00Z'),
+      archivedAt: new Date('2026-01-08T00:00:00Z'),
+      blocks: 1,
     });
 
     // Five reports in stPage for keyset pagination (P1 oldest → P5 newest).
@@ -304,8 +330,11 @@ describeIfDb('reports read APIs (integration)', () => {
     const res = await get(`/api/v1/workspaces/${workspaceId}/reports?limit=100`);
     expect(res.statusCode).toBe(200);
     const ids = res.json().reports.map((r: { id: string }) => r.id);
-    // 5 main + 5 page = 10, and the foreign report must be absent.
-    expect(ids).toHaveLength(10);
+    // 5 main + 5 page + 1 active archive-stream report = 11. The archived report
+    // is hidden by the default `active` scope; the foreign report must be absent.
+    expect(ids).toHaveLength(11);
+    expect(ids).toContain(aActive);
+    expect(ids).not.toContain(aArchived);
     expect(ids).not.toContain(foreignReportId);
     // received_at desc holds: the stPage reports (March) precede the January ones.
     expect(ids.slice(0, 5).every((x: string) => x.startsWith('rpt_'))).toBe(true);
@@ -449,6 +478,49 @@ describeIfDb('reports read APIs (integration)', () => {
       `/api/v1/workspaces/${workspaceId}/streams/${stDeploys}/reports?q=deploy&severity=info`,
     );
     expect(res.json().reports.map((r: { id: string }) => r.id)).toEqual([r1]);
+  });
+
+  // --- Archive scope ---------------------------------------------------------
+
+  it('default feed (active scope) hides archived reports', async () => {
+    const res = await get(`/api/v1/workspaces/${workspaceId}/streams/${stArchive}/reports`);
+    expect(res.statusCode).toBe(200);
+    const ids = res.json().reports.map((r: { id: string }) => r.id);
+    expect(ids).toEqual([aActive]); // archived one excluded
+  });
+
+  it('archived scope returns only archived reports', async () => {
+    const res = await get(
+      `/api/v1/workspaces/${workspaceId}/streams/${stArchive}/reports?archived=archived`,
+    );
+    expect(res.json().reports.map((r: { id: string }) => r.id)).toEqual([aArchived]);
+  });
+
+  it('all scope returns both active and archived (newest-first)', async () => {
+    const res = await get(
+      `/api/v1/workspaces/${workspaceId}/streams/${stArchive}/reports?archived=all`,
+    );
+    // aArchived receivedAt (Jan 7) is newer than aActive (Jan 6).
+    expect(res.json().reports.map((r: { id: string }) => r.id)).toEqual([aArchived, aActive]);
+  });
+
+  it('search with archived=all surfaces an archived match; default scope does not', async () => {
+    const all = await get(
+      `/api/v1/workspaces/${workspaceId}/reports?q=archivable&archived=all&limit=100`,
+    );
+    const allIds = all.json().reports.map((r: { id: string }) => r.id);
+    expect(allIds).toContain(aArchived);
+    expect(allIds).toContain(aActive);
+
+    const active = await get(`/api/v1/workspaces/${workspaceId}/reports?q=archivable&limit=100`);
+    const activeIds = active.json().reports.map((r: { id: string }) => r.id);
+    expect(activeIds).toContain(aActive);
+    expect(activeIds).not.toContain(aArchived); // hidden from default search
+  });
+
+  it('an unknown archived value → 400', async () => {
+    const res = await get(`/api/v1/workspaces/${workspaceId}/reports?archived=bogus`);
+    expect(res.statusCode).toBe(400);
   });
 
   // --- Stream scoping --------------------------------------------------------

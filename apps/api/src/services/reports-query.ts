@@ -7,6 +7,8 @@ import {
   eq,
   gte,
   inArray,
+  isNotNull,
+  isNull,
   lte,
   or,
   sql,
@@ -32,6 +34,17 @@ import { categories, reports, sources, streams } from '../db/index.js';
  */
 
 const SEVERITIES: readonly Severity[] = ['info', 'warning', 'critical'];
+
+/**
+ * Archive scope of a list query:
+ *  - `active`   — only non-archived reports (`archived_at IS NULL`). The default
+ *    feed and stream view. Backed by the partial `…_active_received_idx`.
+ *  - `archived` — only archived reports (`archived_at IS NOT NULL`). The
+ *    archived view.
+ *  - `all`      — no archive filter (used by "include archived" search).
+ */
+export type ArchiveScope = 'active' | 'archived' | 'all';
+const ARCHIVE_SCOPES: readonly ArchiveScope[] = ['active', 'archived', 'all'];
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
@@ -60,6 +73,8 @@ export interface ListParams {
   tags: string[];
   from: Date | null;
   to: Date | null;
+  /** Archive scope — defaults to `active` so the feed hides archived reports. */
+  archived: ArchiveScope;
 }
 
 /** A list item — a SUMMARY: never carries the full `blocks` JSONB. */
@@ -170,6 +185,14 @@ export function parseListQuery(query: Record<string, unknown>): ParseResult {
   const to = parseDate(single(query.to));
   if (to === 'invalid') return { ok: false, message: 'to must be a valid ISO-8601 date' };
 
+  // archived — tri-state; an unknown value is a client error rather than a
+  // silent fallback, so a typo can't quietly leak archived rows into the feed.
+  const archivedRaw = single(query.archived);
+  if (archivedRaw !== undefined && !ARCHIVE_SCOPES.includes(archivedRaw as ArchiveScope)) {
+    return { ok: false, message: `archived must be one of ${ARCHIVE_SCOPES.join(', ')}` };
+  }
+  const archived = (archivedRaw as ArchiveScope) ?? 'active';
+
   return {
     ok: true,
     value: {
@@ -183,6 +206,7 @@ export function parseListQuery(query: Record<string, unknown>): ParseResult {
       tags: collectTags(query.tags),
       from,
       to,
+      archived,
     },
   };
 }
@@ -301,6 +325,11 @@ function listConditions(workspaceId: string, streamId: string | undefined, p: Li
   if (p.tags.length > 0) conditions.push(arrayOverlaps(reports.tags, p.tags));
   if (p.from) conditions.push(gte(reports.receivedAt, p.from));
   if (p.to) conditions.push(lte(reports.receivedAt, p.to));
+  // Archive scope: `active` hides archived (the default feed), `archived` shows
+  // only archived (the archived view), `all` applies no filter (search across
+  // both). `q` ANDs with whatever scope is set, so `all` + `q` searches all.
+  if (p.archived === 'active') conditions.push(isNull(reports.archivedAt));
+  else if (p.archived === 'archived') conditions.push(isNotNull(reports.archivedAt));
   return conditions;
 }
 

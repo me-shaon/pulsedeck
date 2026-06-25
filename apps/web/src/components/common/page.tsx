@@ -34,7 +34,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('mb-5 flex items-start justify-between gap-4', className)}>
+    <div className={cn('mb-6 flex items-start justify-between gap-4', className)}>
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
           {title}

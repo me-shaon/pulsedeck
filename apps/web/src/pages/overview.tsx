@@ -36,9 +36,9 @@ export function OverviewPage() {
     <PageContainer>
       <PageHeader title="Overview" description={`Welcome back to ${workspace.name}.`} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-10">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-10">
         <section className="lg:col-span-2">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-tight">Recent reports</h2>
             <Link
               to="/w/$ws/reports"
@@ -59,7 +59,7 @@ export function OverviewPage() {
               description="Connect an agent on the Sources page to start receiving briefings."
             />
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               {recent.map((report) => (
                 <ReportRow key={report.id} ws={workspace.slug} report={report} />
               ))}
@@ -67,9 +67,9 @@ export function OverviewPage() {
           )}
         </section>
 
-        <section className="flex flex-col gap-6">
+        <section className="flex flex-col gap-8">
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
                 <AlertTriangle className="size-4 text-severity-warning" /> Alerts
               </h2>
@@ -93,13 +93,13 @@ export function OverviewPage() {
                 description="Warning and critical reports will surface here."
               />
             ) : (
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {alerts.map((alert) => (
                   <li key={alert.id}>
                     <Link
                       to="/w/$ws/r/$reportId"
                       params={{ ws: workspace.slug, reportId: alert.id }}
-                      className="group flex items-start gap-2.5 rounded-md border border-border bg-surface px-3 py-2 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="group flex items-start gap-2.5 rounded-md border border-border bg-surface px-3 py-2.5 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {alert.severity ? (
                         <Badge
@@ -126,7 +126,7 @@ export function OverviewPage() {
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">Connected agents</h2>
               <Link
                 to="/w/$ws/sources"

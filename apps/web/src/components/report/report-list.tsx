@@ -95,7 +95,7 @@ export function ReportList({
 
       {/* aria-busy reflects a background refetch (poll) without blocking reads. */}
       <div
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-3"
         aria-busy={query.isFetching && !query.isFetchingNextPage}
       >
         {reports.map((report) => (

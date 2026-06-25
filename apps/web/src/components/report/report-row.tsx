@@ -28,7 +28,7 @@ export function ReportRow({
     <Link
       to="/w/$ws/r/$reportId"
       params={{ ws, reportId: report.id }}
-      className="group flex flex-1 flex-col gap-1.5 rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface px-4 py-3.5 transition-colors hover:border-border-strong hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="min-w-0 truncate text-sm font-semibold tracking-tight text-foreground group-hover:text-foreground">

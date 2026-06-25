@@ -13,6 +13,20 @@ config();
  */
 const PLACEHOLDER_SECRET_RE = /change-?me|insecure|dev-only|placeholder|secret-string|example/i;
 
+/**
+ * Database passwords that are defaults/dev values and must never reach a
+ * production DATABASE_URL. The compose dev default is `pulsedeck`; the rest are
+ * the usual Postgres/example defaults. Checked at boot when NODE_ENV=production.
+ */
+const WEAK_DB_PASSWORDS = new Set([
+  'pulsedeck',
+  'postgres',
+  'password',
+  'root',
+  'admin',
+  'changeme',
+]);
+
 const EnvSchema = z
   .object({
     // Runtime mode. `production` hardens checks (e.g. rejects placeholder
@@ -114,6 +128,32 @@ const EnvSchema = z
           'AUTH_SECRET is a known placeholder/dev value and must not be used in production. ' +
           'Generate a unique secret: `make setup` (writes .env) or `openssl rand -base64 48`.',
       });
+    }
+
+    // Reject the default/dev database password in production (security finding
+    // C2). Backstop to the compose `${POSTGRES_PASSWORD:?…}` fail-fast: even a
+    // hand-set DATABASE_URL carrying `pulsedeck`/`postgres`/empty aborts the boot.
+    if (env.NODE_ENV === 'production') {
+      let dbPassword: string | null = null;
+      try {
+        dbPassword = decodeURIComponent(new URL(env.DATABASE_URL).password);
+      } catch {
+        // Malformed URL is already reported by the `.url()` check above.
+      }
+      if (
+        dbPassword !== null &&
+        (dbPassword === '' ||
+          WEAK_DB_PASSWORDS.has(dbPassword.toLowerCase()) ||
+          PLACEHOLDER_SECRET_RE.test(dbPassword))
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DATABASE_URL'],
+          message:
+            'DATABASE_URL uses an empty or known default/dev database password and must not be ' +
+            'used in production. Generate a strong one: `make setup` (writes .env).',
+        });
+      }
     }
   });
 

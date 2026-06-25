@@ -38,6 +38,12 @@ services:
       - /app/packages/sdk/node_modules
       - /app/packages/demo/node_modules
 
+  # Re-publish Postgres for local tooling (psql / a GUI), bound to loopback only
+  # so it is never exposed beyond this machine. Production publishes no DB port.
+  postgres:
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+
   web:
     build:
       context: .

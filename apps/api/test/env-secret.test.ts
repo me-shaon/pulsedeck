@@ -47,3 +47,41 @@ describe('AUTH_SECRET placeholder policy', () => {
     );
   });
 });
+
+/**
+ * DATABASE_URL password hardening (security finding C2): the default/dev DB
+ * password must boot in development but be rejected under NODE_ENV=production.
+ */
+describe('DATABASE_URL password policy', () => {
+  const STRONG_SECRET = 'm0pe0C2EtDy+pdn6ejZouTl8oA3J7WP0CZ6XDkfFFVPzEn0OGMBg';
+  const prod = (databaseUrl: string) =>
+    loadEnv({ NODE_ENV: 'production', AUTH_SECRET: STRONG_SECRET, DATABASE_URL: databaseUrl });
+
+  it('accepts the dev DB password in development', () => {
+    expect(() =>
+      loadEnv({
+        NODE_ENV: 'development',
+        AUTH_SECRET: 'dev-only-insecure-auth-secret-change-for-prod',
+        DATABASE_URL: 'postgres://pulsedeck:pulsedeck@localhost:5432/pulsedeck',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects default/dev DB passwords in production', () => {
+    for (const pw of ['pulsedeck', 'postgres', 'password', 'root', 'admin']) {
+      expect(() => prod(`postgres://pulsedeck:${pw}@db:5432/pulsedeck`)).toThrow(
+        /default\/dev database password/,
+      );
+    }
+  });
+
+  it('rejects an empty DB password in production', () => {
+    expect(() => prod('postgres://pulsedeck@db:5432/pulsedeck')).toThrow(
+      /default\/dev database password/,
+    );
+  });
+
+  it('accepts a strong unique DB password in production', () => {
+    expect(() => prod('postgres://pulsedeck:8f3c2a1b9d7e4f60a5c8@db:5432/pulsedeck')).not.toThrow();
+  });
+});

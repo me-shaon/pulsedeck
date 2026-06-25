@@ -14,7 +14,10 @@ services:
       # Production posture: the API rejects known placeholder secrets when this
       # is `production` (see apps/api/src/env.ts).
       NODE_ENV: production
-      DATABASE_URL: postgres://pulsedeck:pulsedeck@postgres:5432/pulsedeck
+      # Built from POSTGRES_PASSWORD so the DB password lives in exactly one place
+      # (.env) and is never hardcoded. To use an EXTERNAL/managed Postgres instead,
+      # override this whole value via the DATABASE_URL env var.
+      DATABASE_URL: ${DATABASE_URL:-postgres://pulsedeck:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — run `make setup` or set a strong DB password}@postgres:5432/pulsedeck}
       # Session/token signing secret. NO default on purpose — boot aborts if it is
       # unset so a deployment can never run on a known value. Provide it via .env
       # (compose auto-loads it): run `make setup` to generate one, or set it to
@@ -70,10 +73,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: pulsedeck
-      POSTGRES_PASSWORD: pulsedeck
+      # No default — must be provided via .env (run `make setup`). Same value the
+      # api's DATABASE_URL is built from above, so the secret lives in one place.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — run `make setup` or set a strong DB password}
       POSTGRES_DB: pulsedeck
-    ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+    # Not published to the host in production: the api reaches Postgres over the
+    # internal compose network. The dev overlay re-publishes it on 127.0.0.1 for
+    # local tooling (psql / a GUI). Exposing 5432 to all interfaces with a known
+    # password was the original risk (security finding C2).
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

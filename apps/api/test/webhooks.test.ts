@@ -4,6 +4,8 @@ import type { Webhook } from '../src/db/schema/webhooks.js';
 import { matches } from '../src/webhooks/enqueue.js';
 import { ENVELOPE_VERSION, formatForWebhook } from '../src/webhooks/formatters.js';
 import { signBody, verifySignature, generateWebhookSecret } from '../src/webhooks/signing.js';
+import { fetch as undiciFetch } from 'undici';
+import { createWebhookDispatcher, guardedFetch } from '../src/webhooks/safe-fetch.js';
 import { assertUrlAllowed, isBlockedIp, WebhookUrlError } from '../src/webhooks/ssrf.js';
 import type { WebhookEvent } from '../src/webhooks/types.js';
 
@@ -154,6 +156,26 @@ describe('SSRF guard', () => {
     expect(isBlockedIp('1.1.1.1')).toBe(false);
   });
 
+  it('flags IPv4-mapped IPv6 in both dotted and hex form (H5 bypass)', () => {
+    // ::ffff:169.254.169.254 — the metadata endpoint via a mapped address.
+    expect(isBlockedIp('::ffff:169.254.169.254')).toBe(true); // dotted form
+    expect(isBlockedIp('::ffff:a9fe:a9fe')).toBe(true); // hex form (the bypass)
+    expect(isBlockedIp('::ffff:127.0.0.1')).toBe(true);
+    expect(isBlockedIp('::ffff:7f00:1')).toBe(true); // 127.0.0.1, hex
+    expect(isBlockedIp('::ffff:10.0.0.1')).toBe(true);
+    // IPv4-mapped public address stays allowed.
+    expect(isBlockedIp('::ffff:8.8.8.8')).toBe(false);
+  });
+
+  it('flags NAT64, ULA and link-local; allows public IPv6', () => {
+    expect(isBlockedIp('64:ff9b::169.254.169.254')).toBe(true); // NAT64 → metadata
+    expect(isBlockedIp('fc00::1')).toBe(true); // unique-local
+    expect(isBlockedIp('fe80::1')).toBe(true); // link-local
+    expect(isBlockedIp('::')).toBe(true); // unspecified
+    expect(isBlockedIp('2606:4700:4700::1111')).toBe(false); // public (Cloudflare)
+    expect(isBlockedIp('not-an-ip::garbage')).toBe(true); // unparseable → fail closed
+  });
+
   it('rejects non-http(s) schemes', async () => {
     await expect(assertUrlAllowed('ftp://example.com', false)).rejects.toBeInstanceOf(
       WebhookUrlError,
@@ -176,5 +198,83 @@ describe('SSRF guard', () => {
 
   it('allowPrivateIps bypasses the resolution check (self-host)', async () => {
     await expect(assertUrlAllowed('http://localhost:3000/hook', true)).resolves.toBeInstanceOf(URL);
+  });
+});
+
+describe('guardedFetch — redirect re-validation (C4)', () => {
+  // Build a fetch stub that replays a queue of [status, location?] per call and
+  // records the URLs it was asked to fetch.
+  function stubFetch(steps: Array<{ status: number; location?: string }>) {
+    const urls: string[] = [];
+    let i = 0;
+    const impl = (async (url: string | URL) => {
+      urls.push(String(url));
+      const step = steps[Math.min(i++, steps.length - 1)];
+      const headers = step.location ? { location: step.location } : undefined;
+      return new Response(null, { status: step.status, headers });
+    }) as unknown as typeof fetch;
+    return { impl, urls };
+  }
+
+  it('follows a redirect to a public target and returns the final response', async () => {
+    const { impl, urls } = stubFetch([
+      { status: 302, location: 'https://hooks.example.com/final' },
+      { status: 200 },
+    ]);
+    const res = await guardedFetch(
+      'https://hooks.example.com/start',
+      { method: 'POST' },
+      { fetchImpl: impl, allowPrivateIps: true },
+    );
+    expect(res.status).toBe(200);
+    expect(urls).toEqual(['https://hooks.example.com/start', 'https://hooks.example.com/final']);
+  });
+
+  it('rejects a redirect that points at an internal address (cloud policy)', async () => {
+    const { impl } = stubFetch([
+      { status: 302, location: 'http://169.254.169.254/latest/meta-data/' },
+      { status: 200 },
+    ]);
+    // Start at a public literal so hop 0 passes, then the 3xx aims internal.
+    await expect(
+      guardedFetch(
+        'http://1.1.1.1/hook',
+        { method: 'POST' },
+        { fetchImpl: impl, allowPrivateIps: false },
+      ),
+    ).rejects.toBeInstanceOf(WebhookUrlError);
+  });
+
+  it('fails terminally on an over-long redirect chain', async () => {
+    const { impl } = stubFetch([{ status: 302, location: 'http://1.1.1.1/next' }]); // always 302
+    await expect(
+      guardedFetch(
+        'http://1.1.1.1/start',
+        { method: 'POST' },
+        {
+          fetchImpl: impl,
+          allowPrivateIps: false,
+          maxRedirects: 2,
+        },
+      ),
+    ).rejects.toThrow(/redirects/);
+  });
+
+  it('connect-time pin refuses a hostname that resolves private (C3, real undici)', async () => {
+    // `localhost` resolves to 127.0.0.1/::1; the connector lookup must reject it
+    // before any socket — surfacing as a WebhookUrlError, not a connection error.
+    const dispatcher = createWebhookDispatcher(false);
+    await expect(
+      guardedFetch(
+        'http://localhost/hook',
+        { method: 'POST' },
+        {
+          fetchImpl: undiciFetch as unknown as typeof fetch,
+          dispatcher,
+          allowPrivateIps: false,
+        },
+      ),
+    ).rejects.toBeInstanceOf(WebhookUrlError);
+    await dispatcher?.close();
   });
 });

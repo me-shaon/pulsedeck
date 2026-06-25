@@ -1,9 +1,11 @@
 import { and, asc, eq, inArray, lte } from 'drizzle-orm';
+import { fetch as undiciFetch } from 'undici';
 import type { Db } from '../db/index.js';
 import { webhookDeliveries, webhooks } from '../db/schema/webhooks.js';
 import { FORMATTERS } from './formatters.js';
+import { createWebhookDispatcher, guardedFetch } from './safe-fetch.js';
 import { signBody } from './signing.js';
-import { assertUrlAllowed, WebhookUrlError } from './ssrf.js';
+import { WebhookUrlError } from './ssrf.js';
 import type { ClaimedDelivery } from './types.js';
 
 /**
@@ -77,10 +79,17 @@ export function createWebhookRunner(opts: WebhookRunnerOptions): WebhookRunner {
     allowPrivateIps,
     now = () => new Date(),
     logger = noopLogger,
-    fetchImpl = fetch,
+    // Default to undici's fetch so it's compatible with the SSRF dispatcher below
+    // (a separately-built Agent isn't accepted by Node's global fetch). Tests
+    // inject a fake; the dispatcher/redirect guards no-op around it.
+    fetchImpl = undiciFetch as unknown as typeof fetch,
     jitter = Math.random,
   } = opts;
   const initialDelayMs = opts.initialDelayMs ?? Math.min(pollIntervalMs, 5000);
+
+  // Connect-time IP-pinning dispatcher (undefined when private IPs are allowed).
+  // Built once and reused across deliveries.
+  const dispatcher = createWebhookDispatcher(allowPrivateIps);
 
   let timer: NodeJS.Timeout | null = null;
   let initialTimer: NodeJS.Timeout | null = null;
@@ -143,9 +152,6 @@ export function createWebhookRunner(opts: WebhookRunnerOptions): WebhookRunner {
   async function deliver(row: ClaimedDelivery): Promise<void> {
     const attemptNo = row.attempts + 1;
     try {
-      // Re-validate the target right before sending (DNS-rebinding defense).
-      await assertUrlAllowed(row.url, allowPrivateIps);
-
       const raw = JSON.stringify(row.payload);
       const headers: Record<string, string> = {
         'content-type': 'application/json',
@@ -164,12 +170,14 @@ export function createWebhookRunner(opts: WebhookRunnerOptions): WebhookRunner {
       const timeout = setTimeout(() => controller.abort(), deliveryTimeoutMs);
       let code: number;
       try {
-        const res = await fetchImpl(row.url, {
-          method: 'POST',
-          headers,
-          body: raw,
-          signal: controller.signal,
-        });
+        // guardedFetch validates the URL + every redirect hop and pins the
+        // connection to a validated IP via `dispatcher` (SSRF defense). The
+        // single timeout/abort spans the whole redirect chain.
+        const res = await guardedFetch(
+          row.url,
+          { method: 'POST', headers, body: raw, signal: controller.signal },
+          { fetchImpl, dispatcher, allowPrivateIps },
+        );
         code = res.status;
       } finally {
         clearTimeout(timeout);

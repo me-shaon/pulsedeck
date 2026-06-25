@@ -1,3 +1,4 @@
+import { lookup as dnsLookupCb } from 'node:dns';
 import { lookup } from 'node:dns/promises';
 
 /**
@@ -9,9 +10,15 @@ import { lookup } from 'node:dns/promises';
  * {@link RuntimeConfig.webhook.allowPrivateIps} — allowed on self-host (internal
  * Slack/services are legitimate targets), blocked on cloud.
  *
- * The check runs TWICE: at create/update (fail fast, clear error) AND again in
- * the runner immediately before each POST (re-resolving the host defeats DNS
- * rebinding, where a name resolves public at create time and private at send).
+ * Defense is layered:
+ *   1. {@link assertUrlAllowed} at create/update (fail fast, clear error) and
+ *      again before each send — this catches literal IPs and bad schemes.
+ *   2. {@link makeSsrfLookup} installed on the delivery agent's connector, so the
+ *      address the socket actually connects to is the one that was validated.
+ *      Re-resolving before send is NOT enough on its own: the HTTP client would
+ *      resolve the name a second time, and a rebinding attacker can return a
+ *      public IP to the check and a private IP to that second resolution. Pinning
+ *      the connect-time lookup closes that TOCTOU window.
  */
 
 export class WebhookUrlError extends Error {
@@ -56,22 +63,82 @@ function isBlockedIpv4(ip: string): boolean {
   );
 }
 
+/**
+ * Expand an IPv6 literal to its 16 bytes, or null if it doesn't parse. Handles
+ * `::` compression and a trailing embedded IPv4 (`::ffff:1.2.3.4`). Working on
+ * the raw bytes — instead of string-prefix matching a URL-normalized hostname —
+ * is what closes the IPv4-mapped-in-hex bypass (e.g. `::ffff:a9fe:a9fe`), since
+ * the embedded address is recovered regardless of how the literal was written.
+ */
+function ipv6ToBytes(ip: string): Uint8Array | null {
+  const addr = ip.toLowerCase().split('%')[0]; // strip zone id
+  if (!addr.includes(':')) return null;
+
+  // A trailing dotted-quad (e.g. `::ffff:1.2.3.4`) contributes the last 4 bytes.
+  let tailV4: number[] | null = null;
+  let head = addr;
+  const lastColon = addr.lastIndexOf(':');
+  const afterColon = addr.slice(lastColon + 1);
+  if (afterColon.includes('.')) {
+    const v4 = ipv4ToInt(afterColon);
+    if (v4 == null) return null;
+    tailV4 = [(v4 >>> 24) & 0xff, (v4 >>> 16) & 0xff, (v4 >>> 8) & 0xff, v4 & 0xff];
+    head = addr.slice(0, lastColon + 1) + '0:0'; // placeholder hextets for the v4
+  }
+
+  const parts = head.split('::');
+  if (parts.length > 2) return null; // at most one `::`
+  const toHextets = (s: string): number[] => {
+    if (s === '') return [];
+    return s.split(':').map((h) => parseInt(h, 16));
+  };
+  const left = toHextets(parts[0]);
+  const right = parts.length === 2 ? toHextets(parts[1]) : null;
+
+  let hextets: number[];
+  if (right === null) {
+    hextets = left;
+  } else {
+    const fill = 8 - (left.length + right.length);
+    if (fill < 0) return null;
+    hextets = [...left, ...Array(fill).fill(0), ...right];
+  }
+  if (hextets.length !== 8 || hextets.some((h) => Number.isNaN(h) || h < 0 || h > 0xffff)) {
+    return null;
+  }
+
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 8; i++) {
+    bytes[i * 2] = (hextets[i] >> 8) & 0xff;
+    bytes[i * 2 + 1] = hextets[i] & 0xff;
+  }
+  if (tailV4) bytes.set(tailV4, 12);
+  return bytes;
+}
+
 /** True for an IPv6 loopback/unspecified/ULA/link-local, or a blocked mapped IPv4. */
 function isBlockedIpv6(ip: string): boolean {
-  const addr = ip.toLowerCase().split('%')[0]; // strip zone id
-  if (addr === '::1' || addr === '::') return true; // loopback / unspecified
-  // IPv4-mapped (::ffff:a.b.c.d) — apply the v4 policy to the embedded address.
-  const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(addr);
-  if (mapped) return isBlockedIpv4(mapped[1]);
-  const head = addr.split(':')[0] ?? '';
-  if (head.startsWith('fc') || head.startsWith('fd')) return true; // fc00::/7 ULA
-  if (
-    head.startsWith('fe8') ||
-    head.startsWith('fe9') ||
-    head.startsWith('fea') ||
-    head.startsWith('feb')
-  )
-    return true; // fe80::/10 link-local
+  const bytes = ipv6ToBytes(ip);
+  if (!bytes) return true; // unparseable → fail closed
+
+  const allZeroPrefix = (n: number): boolean => bytes.slice(0, n).every((b) => b === 0);
+
+  // Loopback ::1 and unspecified ::
+  if (allZeroPrefix(15)) return bytes[15] === 0 || bytes[15] === 1;
+
+  // Embedded-IPv4 forms — recover the v4 and apply the v4 policy:
+  //   ::ffff:0:0/96 (IPv4-mapped) and ::/96 (IPv4-compatible, deprecated).
+  const embeddedV4 = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
+  if (allZeroPrefix(10) && bytes[10] === 0xff && bytes[11] === 0xff)
+    return isBlockedIpv4(embeddedV4);
+  if (allZeroPrefix(12)) return isBlockedIpv4(embeddedV4);
+  // NAT64 well-known prefix 64:ff9b::/96 — the embedded v4 is the real target.
+  if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b) {
+    return isBlockedIpv4(embeddedV4);
+  }
+
+  if ((bytes[0] & 0xfe) === 0xfc) return true; // fc00::/7 unique-local
+  if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) return true; // fe80::/10 link-local
   return false;
 }
 
@@ -140,4 +207,41 @@ function isLiteralIp(host: string): boolean {
 async function defaultResolver(host: string): Promise<string[]> {
   const records = await lookup(host, { all: true });
   return records.map((r) => r.address);
+}
+
+/** `dns.lookup`-compatible signature undici's connector consumes. */
+export type SsrfLookup = (
+  hostname: string,
+  options: { all?: boolean; family?: number; [k: string]: unknown },
+  callback: (err: NodeJS.ErrnoException | null, address: unknown, family?: number) => void,
+) => void;
+
+/**
+ * Build a `dns.lookup`-compatible function for undici's connector. It resolves
+ * the host, rejects the whole connection if ANY returned address is blocked, and
+ * otherwise hands the validated addresses straight to the socket — so the IP that
+ * was checked is the IP that is connected to. This is the connect-time pin that
+ * closes the DNS-rebinding/TOCTOU window (the check and the connection share one
+ * resolution). For literal-IP hosts undici skips lookup, so {@link isBlockedIp}
+ * via {@link assertUrlAllowed} remains the guard there.
+ */
+export function makeSsrfLookup(): SsrfLookup {
+  return (hostname, options, callback) => {
+    dnsLookupCb(hostname, { ...options, all: true, verbatim: true }, (err, addresses) => {
+      if (err) return callback(err, undefined);
+      const list = addresses as unknown as Array<{ address: string; family: number }>;
+      const blocked = list.find((a) => isBlockedIp(a.address));
+      if (blocked) {
+        return callback(
+          new WebhookUrlError(
+            'Webhook URL resolves to a private or reserved address, which is not allowed',
+          ),
+          undefined,
+        );
+      }
+      // Honor both calling conventions: array form when `all`, else first match.
+      if (options.all) return callback(null, list as unknown);
+      return callback(null, list[0].address, list[0].family);
+    });
+  };
 }

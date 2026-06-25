@@ -26,6 +26,7 @@
     "ioredis": "^5.4.1",
     "nanoid": "^5.0.9",
     "postgres": "^3.4.5",
+    "undici": "^6.21.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -448,6 +448,9 @@ function CategoryGroup({
   onReorderStreams: (categoryId: string, orderedIds: string[]) => void;
 }) {
   const [open, setOpen] = useState(true);
+  // The platform-owned "Agent updates" lane is read-only: no drag, add, rename,
+  // or delete. Its per-agent status streams are provisioned automatically.
+  const canEdit = canStructure && !category.system;
 
   function handleCategoryDrop(draggedId: string) {
     if (draggedId === category.id) return;
@@ -460,9 +463,9 @@ function CategoryGroup({
   return (
     <div
       className="flex flex-col gap-0.5"
-      draggable={canStructure}
+      draggable={canEdit}
       onDragStart={(e) => {
-        if (!canStructure) return;
+        if (!canEdit) return;
         e.dataTransfer.setData('application/x-pd-category', category.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
@@ -480,7 +483,7 @@ function CategoryGroup({
       }}
     >
       <div className="group/cat flex items-center gap-0.5 rounded-md px-1 py-1 hover:bg-accent/50">
-        {canStructure ? (
+        {canEdit ? (
           <GripVertical
             className="size-3 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover/cat:opacity-100"
             aria-hidden
@@ -503,7 +506,7 @@ function CategoryGroup({
             {category.name}
           </span>
         </button>
-        {canStructure ? (
+        {canEdit ? (
           <>
             <button
               type="button"
@@ -534,15 +537,15 @@ function CategoryGroup({
             <div
               key={stream.id}
               className="group/stream flex items-center"
-              draggable={canStructure}
+              draggable={canEdit}
               onDragStart={(e) => {
-                if (!canStructure) return;
+                if (!canEdit) return;
                 e.stopPropagation();
                 e.dataTransfer.setData('application/x-pd-stream', stream.id);
                 e.dataTransfer.effectAllowed = 'move';
               }}
               onDragOver={(e) => {
-                if (canStructure && e.dataTransfer.types.includes('application/x-pd-stream')) {
+                if (canEdit && e.dataTransfer.types.includes('application/x-pd-stream')) {
                   e.preventDefault();
                 }
               }}
@@ -575,7 +578,7 @@ function CategoryGroup({
                   {stream.reportCount}
                 </span>
               </Link>
-              {canStructure ? (
+              {canEdit ? (
                 <RowMenu
                   label={`${stream.name} options`}
                   canCopyInstructions={canCopyInstructions}

@@ -408,14 +408,24 @@ export const deleteReports = (wsId: string, ids: string[]) =>
     body: { ids },
   });
 
-export const getStreamInstructions = (wsId: string, streamId: string, sourceId: string) =>
+export const getStreamInstructions = (
+  wsId: string,
+  streamId: string,
+  sourceId: string,
+  task?: string,
+) =>
   request<AgentInstructions>(`/workspaces/${wsId}/streams/${streamId}/agent-instructions`, {
-    query: { sourceId },
+    query: { sourceId, ...(task ? { task } : {}) },
   });
 
-export const getCategoryInstructions = (wsId: string, categoryId: string, sourceId: string) =>
+export const getCategoryInstructions = (
+  wsId: string,
+  categoryId: string,
+  sourceId: string,
+  task?: string,
+) =>
   request<AgentInstructions>(`/workspaces/${wsId}/categories/${categoryId}/agent-instructions`, {
-    query: { sourceId },
+    query: { sourceId, ...(task ? { task } : {}) },
   });
 
 // --- Dashboards ----------------------------------------------------------

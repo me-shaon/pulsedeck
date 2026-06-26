@@ -13,6 +13,7 @@ import {
   type Source,
 } from '../db/index.js';
 import { generateApiKey, generateRegToken, hashToken } from '../auth/tokens.js';
+import { slugify } from './structure.js';
 
 /**
  * Source registration & management service (PRD "Source Management" +
@@ -401,6 +402,112 @@ export async function listSources(db: Db, workspaceId: string): Promise<SourceLi
   }));
 }
 
+/** The per-workspace system lane every agent reports its own status to. */
+export const AGENT_UPDATES_CATEGORY_SLUG = 'agent-updates';
+export const AGENT_UPDATES_CATEGORY_NAME = 'Agent updates';
+
+/** Condense a multi-line task to one short phrase for the setup-confirmation line. */
+function summarizeTask(task: string): string {
+  const firstLine = task.trim().split('\n')[0].trim();
+  return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
+}
+
+/** Pick a stream slug free within `categoryId`, deduping `base` with `-2`, `-3`… */
+async function uniqueStreamSlug(tx: Tx, categoryId: string, base: string): Promise<string> {
+  const rows = await tx
+    .select({ slug: streams.slug })
+    .from(streams)
+    .where(eq(streams.categoryId, categoryId));
+  const taken = new Set(rows.map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base.slice(0, 76)}-${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/**
+ * Provision (idempotently) this source's slot in the workspace's "Agent updates"
+ * lane and grant it write access, returning the status stream slug to embed in
+ * the setup prompt. Called at prompt-generation, before the agent ever registers,
+ * so the slug the operator copies is the slug that exists.
+ *
+ * The lane is one system category ("agent-updates") with one stream per source
+ * (named after the agent). Grants are inserted for BOTH join tables so the lane
+ * is reachable regardless of the source's scope: category-scoped sources are
+ * gated on `source_categories`, stream-scoped on `source_streams`, and
+ * workspace-scoped sources ignore both — inserting both covers every case
+ * without touching ingestion's scope check.
+ */
+export async function ensureAgentUpdatesDestination(
+  db: Db,
+  source: Source,
+): Promise<{ categorySlug: string; streamSlug: string }> {
+  return db.transaction(async (tx) => {
+    // 1. Ensure the workspace's system "Agent updates" category.
+    await tx
+      .insert(categories)
+      .values({
+        id: id('cat'),
+        workspaceId: source.workspaceId,
+        name: AGENT_UPDATES_CATEGORY_NAME,
+        slug: AGENT_UPDATES_CATEGORY_SLUG,
+        labelSource: 'user',
+        system: true,
+      })
+      .onConflictDoNothing({ target: [categories.workspaceId, categories.slug] });
+    const [cat] = await tx
+      .select({ id: categories.id })
+      .from(categories)
+      .where(
+        and(
+          eq(categories.workspaceId, source.workspaceId),
+          eq(categories.slug, AGENT_UPDATES_CATEGORY_SLUG),
+        ),
+      )
+      .limit(1);
+
+    // 2. Reuse this source's existing status stream if it already has one
+    //    (regeneration must be stable — never mint a fresh `-2` each time).
+    const [existing] = await tx
+      .select({ slug: streams.slug })
+      .from(streams)
+      .innerJoin(sourceStreams, eq(sourceStreams.streamId, streams.id))
+      .where(and(eq(streams.categoryId, cat.id), eq(sourceStreams.sourceId, source.id)))
+      .limit(1);
+
+    let streamSlug: string;
+    if (existing) {
+      streamSlug = existing.slug;
+    } else {
+      // 3. Mint a per-agent stream, slug derived from the agent name.
+      streamSlug = await uniqueStreamSlug(tx, cat.id, slugify(source.name) || 'agent');
+      const [stream] = await tx
+        .insert(streams)
+        .values({
+          id: id('stm'),
+          categoryId: cat.id,
+          name: source.name,
+          slug: streamSlug,
+          labelSource: 'user',
+        })
+        .returning({ id: streams.id });
+      await tx
+        .insert(sourceStreams)
+        .values({ sourceId: source.id, streamId: stream.id })
+        .onConflictDoNothing();
+    }
+
+    // 4. Grant the category too, so a category-scoped source can reach the lane.
+    await tx
+      .insert(sourceCategories)
+      .values({ sourceId: source.id, categoryId: cat.id })
+      .onConflictDoNothing();
+
+    return { categorySlug: AGENT_UPDATES_CATEGORY_SLUG, streamSlug };
+  });
+}
+
 /**
  * Render the copyable agent setup prompt (PRD "Copyable Agent Setup Prompt"),
  * self-contained so an operator can paste it into any agent with zero docs.
@@ -512,11 +619,20 @@ export type InstructionDestination =
  * pre-filled, so the operator pastes it into an agent and is done. Category-level
  * leaves the stream choice to the agent (autocreate is on).
  */
+export interface DestinationPromptOptions {
+  /** Operator's free-text task instruction; rendered verbatim, never stored. */
+  task?: string;
+  /** Slug of this source's stream in the "agent-updates" lane (see {@link ensureAgentUpdatesDestination}). */
+  statusStreamSlug: string;
+}
+
 export function buildDestinationSetupPrompt(
   baseUrl: string,
   regToken: string,
   dest: InstructionDestination,
+  opts: DestinationPromptOptions,
 ): string {
+  const statusSlug = opts.statusStreamSlug;
   const categoryLine = `"category": { "slug": "${dest.categorySlug}" },`;
   const streamLine = dest.streamSlug
     ? `"stream":   { "slug": "${dest.streamSlug}" },`
@@ -525,10 +641,21 @@ export function buildDestinationSetupPrompt(
     ? `Push every report to category "${dest.categorySlug}", stream "${dest.streamSlug}".`
     : `Push reports to category "${dest.categorySlug}"; choose or create a stream slug per report.`;
 
+  const task = opts.task?.trim();
+  const taskSection = task
+    ? `────────────────────────────────────────────────────────
+YOUR TASK
+────────────────────────────────────────────────────────
+${task}
+
+`
+    : '';
+
   return `You are integrated with PulseDeck, a reporting platform. Publish your structured
 results to it by following this protocol exactly.
 
-${destNote}
+${taskSection}Report your FINDINGS to:  ${destNote}
+Report your OWN STATUS to: category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusSlug}".
 
 BASE URL: ${baseUrl}
 
@@ -585,6 +712,21 @@ STEP 3 — HANDLE RESPONSES
   409      Unknown slug with autocreate disabled. Stop; do not invent slugs.
   429      Rate limited. Back off exponentially, then retry.
   5xx      Server error. Back off and retry; the Idempotency-Key makes it safe.
+
+────────────────────────────────────────────────────────
+AGENT STATUS — category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusSlug}"
+────────────────────────────────────────────────────────
+This is your own operational lane, separate from your findings. Report YOUR
+state here; report what you observe to the destination above. Never mix them: a
+monitored thing failing is a FINDING; YOU being unable to run is a STATUS update.
+
+Right after STEP 1 registers you, publish one setup-confirmation here
+(severity: info — "setup complete${task ? ' — I will ' + summarizeTask(task) : ''}").
+After that, post here ONLY on these events (routine results stay findings):
+  - you cannot run the task ... critical  (crash, exception, network down, bad target creds)
+  - partial failure .......... warning   (ran, but some sub-tasks couldn't execute)
+  - recovered ................ info      (first good run after a failure)
+  - your own creds expiring .. warning   (a token/key YOUR task needs — not the PulseDeck key)
 
 ────────────────────────────────────────────────────────
 STEP 4 — REMEMBER THIS (do it once, so you never need this prompt again)

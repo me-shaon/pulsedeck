@@ -208,6 +208,8 @@ export interface TreeCategory {
   slug: string;
   name: string;
   labelSource: LabelSource;
+  /** Platform-owned lane (e.g. "Agent updates"); operators can't rename/delete it. */
+  system: boolean;
   position: number;
   streams: TreeStream[];
 }

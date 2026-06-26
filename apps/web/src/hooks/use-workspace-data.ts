@@ -131,9 +131,14 @@ export function useStructureMutations(wsId: string) {
  */
 export function useAgentInstructions(wsId: string) {
   return useMutation({
-    mutationFn: (target: { kind: 'category' | 'stream'; id: string; sourceId: string }) =>
+    mutationFn: (target: {
+      kind: 'category' | 'stream';
+      id: string;
+      sourceId: string;
+      task?: string;
+    }) =>
       target.kind === 'stream'
-        ? getStreamInstructions(wsId, target.id, target.sourceId)
-        : getCategoryInstructions(wsId, target.id, target.sourceId),
+        ? getStreamInstructions(wsId, target.id, target.sourceId, target.task)
+        : getCategoryInstructions(wsId, target.id, target.sourceId, target.task),
   });
 }

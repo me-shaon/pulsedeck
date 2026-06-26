@@ -15,7 +15,11 @@ import {
   reorderStreams,
   type StructureError,
 } from '../services/structure.js';
-import { buildDestinationSetupPrompt, reissueRegistrationToken } from '../services/sources.js';
+import {
+  buildDestinationSetupPrompt,
+  ensureAgentUpdatesDestination,
+  reissueRegistrationToken,
+} from '../services/sources.js';
 
 /**
  * Manual category/stream management + destination-scoped agent instructions
@@ -37,7 +41,11 @@ const CreateCategoryBody = z.object({
 });
 const RenameBody = z.object({ name: z.string().min(1).max(120) });
 const ReorderBody = z.object({ ids: z.array(z.string().min(1)).min(1).max(500) });
-const InstrQuery = z.object({ sourceId: z.string().min(1) });
+const InstrQuery = z.object({
+  sourceId: z.string().min(1),
+  // Optional free-text task; rendered verbatim into the prompt, never stored.
+  task: z.string().max(4000).optional(),
+});
 
 const BASE_URL_PLACEHOLDER = 'https://your-pulsedeck-host.example';
 const BASE_URL_NOTE =
@@ -46,6 +54,7 @@ const BASE_URL_NOTE =
 function statusForError(e: StructureError): number {
   if (e === 'slug_exists') return 409;
   if (e === 'not_found') return 404;
+  if (e === 'forbidden') return 403;
   return 400; // bad_order
 }
 
@@ -200,13 +209,16 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!source) return reply.code(404).send({ error: 'Source not found' });
 
       const { baseUrl, isPlaceholder } = resolveBaseUrl();
+      const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
       const regToken = await reissueRegistrationToken(db, source.id, req.user!.id);
       return reply.send({
         registrationToken: regToken,
-        setupPrompt: buildDestinationSetupPrompt(baseUrl, regToken, {
-          categorySlug: row.categorySlug,
-          streamSlug: row.streamSlug,
-        }),
+        setupPrompt: buildDestinationSetupPrompt(
+          baseUrl,
+          regToken,
+          { categorySlug: row.categorySlug, streamSlug: row.streamSlug },
+          { task: q.data.task, statusStreamSlug },
+        ),
         schema: getSchemaInfo(),
         ...(isPlaceholder ? { baseUrlNote: BASE_URL_NOTE } : {}),
       });
@@ -230,10 +242,16 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!source) return reply.code(404).send({ error: 'Source not found' });
 
       const { baseUrl, isPlaceholder } = resolveBaseUrl();
+      const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
       const regToken = await reissueRegistrationToken(db, source.id, req.user!.id);
       return reply.send({
         registrationToken: regToken,
-        setupPrompt: buildDestinationSetupPrompt(baseUrl, regToken, { categorySlug: cat.slug }),
+        setupPrompt: buildDestinationSetupPrompt(
+          baseUrl,
+          regToken,
+          { categorySlug: cat.slug },
+          { task: q.data.task, statusStreamSlug },
+        ),
         schema: getSchemaInfo(),
         ...(isPlaceholder ? { baseUrlNote: BASE_URL_NOTE } : {}),
       });

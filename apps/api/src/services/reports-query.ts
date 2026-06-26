@@ -570,6 +570,7 @@ export interface TreeCategory {
   slug: string;
   name: string;
   labelSource: 'auto' | 'user';
+  system: boolean;
   position: number;
   streams: TreeStream[];
 }
@@ -591,6 +592,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
       slug: categories.slug,
       name: categories.name,
       labelSource: categories.labelSource,
+      system: categories.system,
       position: categories.position,
     })
     .from(categories)
@@ -649,6 +651,7 @@ export async function getTree(db: Db, workspaceId: string): Promise<TreeCategory
     slug: c.slug,
     name: c.name,
     labelSource: c.labelSource,
+    system: c.system,
     position: c.position,
     streams: byCategory.get(c.id) ?? [],
   }));

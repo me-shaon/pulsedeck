@@ -13,7 +13,7 @@ import { categories, id, streams, type Category, type Stream } from '../db/index
  * `ingestion.ts` is the `labelSource: 'auto'` counterpart.
  */
 
-export type StructureError = 'slug_exists' | 'not_found' | 'bad_order';
+export type StructureError = 'slug_exists' | 'not_found' | 'bad_order' | 'forbidden';
 
 /** Slugify a display name: lowercase, non-alphanumerics → single hyphen, trim. */
 export function slugify(input: string): string {
@@ -139,6 +139,8 @@ export async function renameCategory(
 ): Promise<{ category: Category } | { error: StructureError }> {
   const existing = await loadCategory(db, workspaceId, categoryId);
   if (!existing) return { error: 'not_found' };
+  // System categories (the "Agent updates" lane) are platform-owned.
+  if (existing.system) return { error: 'forbidden' };
   const [row] = await db
     .update(categories)
     .set({ name, labelSource: 'user' })
@@ -170,6 +172,7 @@ export async function deleteCategory(
 ): Promise<{ ok: true } | { error: StructureError }> {
   const existing = await loadCategory(db, workspaceId, categoryId);
   if (!existing) return { error: 'not_found' };
+  if (existing.system) return { error: 'forbidden' };
   // FK cascade removes streams and their reports.
   await db.delete(categories).where(eq(categories.id, categoryId));
   return { ok: true };

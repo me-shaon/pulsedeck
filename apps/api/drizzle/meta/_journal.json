@@ -71,6 +71,13 @@
       "when": 1782463721146,
       "tag": "0009_melodic_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782465822440,
+      "tag": "0010_bored_guardian",
+      "breakpoints": true
     }
   ]
 }

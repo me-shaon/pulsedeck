@@ -1,4 +1,4 @@
-import { integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { workspaces } from './workspaces.js';
 
 /**
@@ -20,6 +20,9 @@ export const categories = pgTable(
     labelSource: text('label_source', { enum: ['auto', 'user'] })
       .notNull()
       .default('auto'),
+    // System-owned category (e.g. the per-workspace "Agent updates" lane). The
+    // platform provisions and writes to it; operators can't rename or delete it.
+    system: boolean('system').notNull().default(false),
     position: integer('position').notNull().default(0),
   },
   (t) => [uniqueIndex('categories_workspace_slug_uq').on(t.workspaceId, t.slug)],

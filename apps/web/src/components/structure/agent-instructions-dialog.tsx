@@ -49,12 +49,14 @@ export function AgentInstructionsDialog({
   const sources = useSources(wsId, open);
   const instructions = useAgentInstructions(wsId);
   const [sourceId, setSourceId] = useState<string>('');
+  const [task, setTask] = useState<string>('');
   const [result, setResult] = useState<AgentInstructions | null>(null);
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
     if (open) {
       setSourceId('');
+      setTask('');
       setResult(null);
       setError(null);
     }
@@ -64,7 +66,12 @@ export function AgentInstructionsDialog({
     if (!sourceId || !target) return;
     setError(null);
     try {
-      const res = await instructions.mutateAsync({ kind: target.kind, id: target.id, sourceId });
+      const res = await instructions.mutateAsync({
+        kind: target.kind,
+        id: target.id,
+        sourceId,
+        task: task.trim() || undefined,
+      });
       setResult(res);
     } catch (e) {
       setError(e);
@@ -115,6 +122,24 @@ export function AgentInstructionsDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {!result ? (
+              <div className="flex flex-col gap-1.5">
+                <span className={fieldLabel}>What should this agent do? (optional)</span>
+                <textarea
+                  value={task}
+                  onChange={(e) => setTask(e.target.value)}
+                  rows={3}
+                  maxLength={4000}
+                  placeholder="e.g. Every 5 minutes, HTTP-check these URLs and report up/down + latency: https://…"
+                  data-ring="self"
+                  className="w-full rounded-md border border-input bg-surface px-2.5 py-1.5 text-sm text-foreground shadow-[inset_0_1px_0_0_rgba(0,0,0,0.02)] transition-colors placeholder:text-muted-foreground focus-visible:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <p className="text-[0.6875rem] text-muted-foreground">
+                  Woven into the prompt as the agent’s task. Not stored.
+                </p>
+              </div>
+            ) : null}
 
             {error ? <p className="text-xs text-destructive">{errorMessage(error)}</p> : null}
 

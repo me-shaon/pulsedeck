@@ -62,6 +62,14 @@ const linkInactive = { className: 'text-muted-foreground hover:bg-accent hover:t
 const streamBase =
   'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+// Safari/WebKit returns an empty string from `dataTransfer.getData()` for custom
+// MIME types during the `drop` event (data is only readable on dragstart/drop in
+// some engines, and custom types are flaky in nested draggable trees). So track
+// what's being dragged in a module-level ref set on dragstart and read on drop,
+// instead of round-tripping the id through dataTransfer. One drag at a time, so a
+// single shared slot is safe; it's cleared on dragend.
+let activeDrag: { kind: 'category' | 'stream'; id: string } | null = null;
+
 const NAV = [
   { label: 'All reports', icon: Hash, to: '/w/$ws/reports' as const },
   { label: 'Search', icon: Search, to: '/w/$ws/search' as const },
@@ -467,21 +475,24 @@ function CategoryGroup({
       draggable={canReorder}
       onDragStart={(e) => {
         if (!canReorder) return;
+        activeDrag = { kind: 'category', id: category.id };
+        // setData is still required for the drag to initiate in some engines.
         e.dataTransfer.setData('application/x-pd-category', category.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
+      onDragEnd={() => {
+        activeDrag = null;
+      }}
       onDragOver={(e) => {
-        if (canStructure) {
+        if (canStructure && activeDrag?.kind === 'category') {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
         }
       }}
       onDrop={(e) => {
-        const id = e.dataTransfer.getData('application/x-pd-category');
-        if (id) {
-          e.preventDefault();
-          handleCategoryDrop(id);
-        }
+        if (activeDrag?.kind !== 'category') return;
+        e.preventDefault();
+        handleCategoryDrop(activeDrag.id);
       }}
     >
       <div className="group/cat flex items-center gap-0.5 rounded-md px-1 py-1 hover:bg-accent/50">
@@ -545,18 +556,23 @@ function CategoryGroup({
               onDragStart={(e) => {
                 if (!canEdit) return;
                 e.stopPropagation();
+                activeDrag = { kind: 'stream', id: stream.id };
                 e.dataTransfer.setData('application/x-pd-stream', stream.id);
                 e.dataTransfer.effectAllowed = 'move';
               }}
+              onDragEnd={() => {
+                activeDrag = null;
+              }}
               onDragOver={(e) => {
-                if (canEdit) {
+                if (canEdit && activeDrag?.kind === 'stream') {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                 }
               }}
               onDrop={(e) => {
-                const draggedId = e.dataTransfer.getData('application/x-pd-stream');
-                if (!draggedId || draggedId === stream.id) return;
+                if (activeDrag?.kind !== 'stream') return;
+                const draggedId = activeDrag.id;
+                if (draggedId === stream.id) return;
                 e.preventDefault();
                 e.stopPropagation();
                 const streamIds = category.streams.map((s) => s.id);

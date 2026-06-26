@@ -471,8 +471,9 @@ function CategoryGroup({
         e.dataTransfer.effectAllowed = 'move';
       }}
       onDragOver={(e) => {
-        if (canStructure && e.dataTransfer.types.includes('application/x-pd-category')) {
+        if (canStructure) {
           e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
         }
       }}
       onDrop={(e) => {
@@ -548,8 +549,9 @@ function CategoryGroup({
                 e.dataTransfer.effectAllowed = 'move';
               }}
               onDragOver={(e) => {
-                if (canEdit && e.dataTransfer.types.includes('application/x-pd-stream')) {
+                if (canEdit) {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
                 }
               }}
               onDrop={(e) => {

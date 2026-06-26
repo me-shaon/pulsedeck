@@ -78,7 +78,10 @@ export function AgentInstructionsDialog({
     }
   }
 
-  const noSources = sources.data && sources.data.length === 0;
+  // Revoked agents can't register or report — exclude them from the picker so
+  // operators never hand new work to a disabled source.
+  const availableSources = (sources.data ?? []).filter((s) => s.status !== 'revoked');
+  const noSources = sources.data && availableSources.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,7 +117,7 @@ export function AgentInstructionsDialog({
                   <SelectValue placeholder="Choose a source…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sources.data?.map((s) => (
+                  {availableSources.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>

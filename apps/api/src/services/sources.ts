@@ -514,9 +514,15 @@ export async function ensureAgentUpdatesDestination(
  * BASE_URL and the one-time registration token are filled in; the live schema
  * version is embedded and the schema-discovery URL is referenced for updates.
  */
-export function buildSetupPrompt(baseUrl: string, regToken: string): string {
+export function buildSetupPrompt(
+  baseUrl: string,
+  regToken: string,
+  statusStreamSlug: string,
+): string {
   return `You are integrated with PulseDeck, a reporting platform. Publish your structured
 results to it by following this protocol exactly.
+
+Report your OWN STATUS to: category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusStreamSlug}".
 
 BASE URL: ${baseUrl}
 
@@ -578,6 +584,22 @@ STEP 3 — HANDLE RESPONSES
   429      Rate limited. Back off exponentially (1s, 2s, 4s...) then retry.
   5xx      Server error. Back off exponentially and retry; the Idempotency-Key
            makes retries safe.
+
+────────────────────────────────────────────────────────
+AGENT STATUS — category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusStreamSlug}"
+────────────────────────────────────────────────────────
+This is your own operational lane, separate from your findings. Report YOUR
+state here; report what you observe to your content category/stream. Never mix
+them: a monitored thing failing is a FINDING; YOU being unable to run is a
+STATUS update.
+
+Right after STEP 1 registers you, publish one setup-confirmation here
+(severity: info — "setup complete"). After that, post here ONLY on these events
+(routine results stay findings):
+  - you cannot run the task ... critical  (crash, exception, network down, bad target creds)
+  - partial failure .......... warning   (ran, but some sub-tasks couldn't execute)
+  - recovered ................ info      (first good run after a failure)
+  - your own creds expiring .. warning   (a token/key YOUR task needs — not the PulseDeck key)
 
 ────────────────────────────────────────────────────────
 STEP 4 — REMEMBER THIS (do it once, so you never need this prompt again)

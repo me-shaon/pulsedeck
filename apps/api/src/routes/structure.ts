@@ -207,6 +207,8 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!row) return reply.code(404).send({ error: 'Stream not found' });
       const source = await loadWsSource(workspaceId, q.data.sourceId);
       if (!source) return reply.code(404).send({ error: 'Source not found' });
+      // A revoked agent is disabled; don't mint it a fresh registration token.
+      if (source.revokedAt) return reply.code(409).send({ error: 'Source is revoked' });
 
       const { baseUrl, isPlaceholder } = resolveBaseUrl();
       const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
@@ -240,6 +242,8 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!cat) return reply.code(404).send({ error: 'Category not found' });
       const source = await loadWsSource(workspaceId, q.data.sourceId);
       if (!source) return reply.code(404).send({ error: 'Source not found' });
+      // A revoked agent is disabled; don't mint it a fresh registration token.
+      if (source.revokedAt) return reply.code(409).send({ error: 'Source is revoked' });
 
       const { baseUrl, isPlaceholder } = resolveBaseUrl();
       const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);

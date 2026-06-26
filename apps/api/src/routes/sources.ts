@@ -7,6 +7,7 @@ import { sources, type Source } from '../db/index.js';
 import {
   buildSetupPrompt,
   createSource,
+  ensureAgentUpdatesDestination,
   listSources,
   registerSource,
   reissueRegistrationToken,
@@ -74,9 +75,14 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
       : { baseUrl: BASE_URL_PLACEHOLDER, isPlaceholder: true };
   }
 
-  /** Build the one-time setup payload returned on create / re-issue. */
-  function setupPayload(regToken: string) {
+  /**
+   * Build the one-time setup payload returned on create / re-issue. Provisions
+   * the source's "Agent updates" status lane (idempotent) so the prompt can
+   * route its self-status there, just like the destination-scoped prompts.
+   */
+  async function setupPayload(regToken: string, source: Source) {
     const { baseUrl, isPlaceholder } = resolveBaseUrl();
+    const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
     const payload: {
       registrationToken: string;
       setupPrompt: string;
@@ -84,7 +90,7 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
       baseUrlNote?: string;
     } = {
       registrationToken: regToken,
-      setupPrompt: buildSetupPrompt(baseUrl, regToken),
+      setupPrompt: buildSetupPrompt(baseUrl, regToken, statusStreamSlug),
       schema: getSchemaInfo(),
     };
     if (isPlaceholder) {
@@ -194,7 +200,7 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
         allowStreamAutocreate: result.source.allowStreamAutocreate,
         createdAt: result.source.createdAt,
       },
-      ...setupPayload(result.registrationToken),
+      ...(await setupPayload(result.registrationToken, result.source)),
     });
   });
 
@@ -210,7 +216,7 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
       const regToken = await reissueRegistrationToken(db, sourceId, request.user!.id);
       return reply.code(201).send({
         source: { id: source.id, name: source.name },
-        ...setupPayload(regToken),
+        ...(await setupPayload(regToken, source)),
       });
     },
   );

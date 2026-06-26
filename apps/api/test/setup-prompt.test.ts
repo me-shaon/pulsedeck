@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildDestinationSetupPrompt } from '../src/services/sources.js';
+import { buildDestinationSetupPrompt, buildSetupPrompt } from '../src/services/sources.js';
+
+describe('buildSetupPrompt', () => {
+  it('routes status to the agent-updates lane and includes the status section', () => {
+    const p = buildSetupPrompt('https://pd.example', 'reg_xyz', 'uptime-bot');
+    expect(p).toContain('category "agent-updates", stream "uptime-bot"');
+    expect(p).toContain('AGENT STATUS');
+    expect(p).toContain('reg_xyz');
+    // Generic prompt still leaves the findings destination for the agent.
+    expect(p).toContain('<category slug>');
+  });
+});
 
 describe('buildDestinationSetupPrompt', () => {
   const base = 'https://pd.example';

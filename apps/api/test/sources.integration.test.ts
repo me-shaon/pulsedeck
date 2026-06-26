@@ -143,6 +143,9 @@ describeIfDb('sources: registration & management (integration)', () => {
     expect(body.setupPrompt).toContain(AUTH_ENV.BETTER_AUTH_URL);
     expect(body.setupPrompt).toContain(regToken);
     expect(body.setupPrompt).toContain('1.0');
+    // The generic prompt routes the agent's own status to the agent-updates lane.
+    expect(body.setupPrompt).toContain('category "agent-updates", stream "hermes-prod"');
+    expect(body.setupPrompt).toContain('AGENT STATUS');
     expect(body.schema.version).toBe('1.0');
   });
 

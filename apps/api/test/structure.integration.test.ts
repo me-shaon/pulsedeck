@@ -504,6 +504,37 @@ describeIfDb('structure: manual category/stream management (integration)', () =>
     expect(res.json().setupPrompt).toContain('Ping these URLs every 5m and report up/down');
   });
 
+  it('route: agent-instructions for a revoked source → 409', async () => {
+    const cat = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/workspaces/${workspaceId}/categories`,
+        headers: { cookie: adminCookie },
+        payload: { name: 'Revoke Cat', slug: 'revoke-cat' },
+      })
+    ).json().category;
+    const src = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/workspaces/${workspaceId}/sources`,
+        headers: { cookie: adminCookie },
+        payload: { name: 'Doomed Bot' },
+      })
+    ).json().source;
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${workspaceId}/sources/${src.id}/revoke`,
+      headers: { cookie: adminCookie },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/workspaces/${workspaceId}/categories/${cat.id}/agent-instructions?sourceId=${src.id}`,
+      headers: { cookie: adminCookie },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
   it('route: the system agent-updates category cannot be renamed or deleted', async () => {
     const src = (
       await app.inject({

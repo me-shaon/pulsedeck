@@ -25,6 +25,12 @@ services:
       # (overrides the inherited prod `NODE_ENV: production`). AUTH_SECRET itself
       # still comes from .env (the prod compose's `${AUTH_SECRET:?…}` reads it).
       NODE_ENV: development
+      # Force the DB host to the `postgres` service, even if .env has a stale
+      # DATABASE_URL (e.g. a `localhost` value left over from non-Docker dev).
+      # Without this, Compose's auto-loaded .env would override the constructed
+      # URL and point the container at itself. Hardcoded here so `make dev` is
+      # bulletproof; non-Docker dev uses its own localhost URL from .env.
+      DATABASE_URL: postgres://pulsedeck:${POSTGRES_PASSWORD:-pulsedeck}@postgres:5432/pulsedeck
       # Bind-mounted file events don't propagate natively on macOS/Windows;
       # polling makes tsx/chokidar see your edits.
       CHOKIDAR_USEPOLLING: 'true'

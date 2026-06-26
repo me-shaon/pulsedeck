@@ -105,7 +105,11 @@ EOF
 ```
 
 All other options (retention, OAuth, signup mode, …) are documented in
-[`.env.example`](./.env.example).
+[`.env.example`](./.env.example). Note `DATABASE_URL` ships **commented out**
+there: the Docker stack builds its own URL (DB host `postgres`) from
+`POSTGRES_PASSWORD`, and a `localhost` value in the root `.env` would break it.
+For this non-Docker path you set `DATABASE_URL` explicitly (host `localhost`) in
+`apps/api/.env`, as above.
 
 #### 4a. Local development (hot reload)
 

@@ -448,8 +448,9 @@ function CategoryGroup({
   onReorderStreams: (categoryId: string, orderedIds: string[]) => void;
 }) {
   const [open, setOpen] = useState(true);
-  // The platform-owned "Agent updates" lane is read-only: no drag, add, rename,
-  // or delete. Its per-agent status streams are provisioned automatically.
+  // System categories (e.g. "Agent updates") can be reordered but not
+  // directly edited (no add/rename/delete). User categories get full control.
+  const canReorder = canStructure;
   const canEdit = canStructure && !category.system;
 
   function handleCategoryDrop(draggedId: string) {
@@ -463,9 +464,9 @@ function CategoryGroup({
   return (
     <div
       className="flex flex-col gap-0.5"
-      draggable={canEdit}
+      draggable={canReorder}
       onDragStart={(e) => {
-        if (!canEdit) return;
+        if (!canReorder) return;
         e.dataTransfer.setData('application/x-pd-category', category.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
@@ -483,12 +484,14 @@ function CategoryGroup({
       }}
     >
       <div className="group/cat flex items-center gap-0.5 rounded-md px-1 py-1 hover:bg-accent/50">
-        {canEdit ? (
+        {canReorder ? (
           <GripVertical
             className="size-3 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover/cat:opacity-100"
             aria-hidden
           />
-        ) : null}
+        ) : (
+          <span className="size-3 shrink-0" aria-hidden />
+        )}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}

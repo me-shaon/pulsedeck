@@ -622,7 +622,11 @@ RULES
 - Keep payloads within limits: <=50 blocks, <=1000 table rows, <=1 MB total.
 - Never send raw HTML in markdown blocks.
 - The schema may gain optional fields over time. Fetch the latest anytime:
-    GET ${baseUrl}/api/v1/schema`;
+    GET ${baseUrl}/api/v1/schema
+- Cache the schema and SCHEMA VERSION after first fetch. If the schema endpoint
+  times out, proceed with your cached copy — the contract is stable within a
+  version, and optional fields are additive. Retry a timed-out schema fetch up
+  to 5 times with exponential backoff (1s, 2s, 4s, 8s, 16s) before giving up.`;
 }
 
 export type InstructionDestination =

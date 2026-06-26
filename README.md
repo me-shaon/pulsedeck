@@ -35,12 +35,17 @@ Agents, scripts, and automations send their reports to PulseDeck. You get one cl
 
 ## Quick start
 
-You need [Docker](https://docs.docker.com/get-docker/). That's it.
+You need [Docker](https://docs.docker.com/get-docker/) and `make` (plus
+`openssl`, preinstalled on macOS/Linux).
 
 ```bash
 git clone <repo-url> pulsedeck && cd pulsedeck
-docker compose up
+make setup        # creates .env and generates strong secrets (idempotent)
+docker compose up # or `make up` to build + run detached
 ```
+
+`make setup` is required: the stack refuses to boot without a real
+`AUTH_SECRET`/`POSTGRES_PASSWORD`, so it can never run on a known value.
 
 Open **http://localhost:3000**, create your account and workspace, and you're running.
 
@@ -105,7 +110,11 @@ EOF
 ```
 
 All other options (retention, OAuth, signup mode, …) are documented in
-[`.env.example`](./.env.example).
+[`.env.example`](./.env.example). Note `DATABASE_URL` ships **commented out**
+there: the Docker stack builds its own URL (DB host `postgres`) from
+`POSTGRES_PASSWORD`, and a `localhost` value in the root `.env` would break it.
+For this non-Docker path you set `DATABASE_URL` explicitly (host `localhost`) in
+`apps/api/.env`, as above.
 
 #### 4a. Local development (hot reload)
 

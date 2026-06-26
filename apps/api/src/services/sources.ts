@@ -457,6 +457,26 @@ STEP 3 — HANDLE RESPONSES
            makes retries safe.
 
 ────────────────────────────────────────────────────────
+STEP 4 — REMEMBER THIS (do it once, so you never need this prompt again)
+────────────────────────────────────────────────────────
+This prompt is one-time setup. Persist the integration so future reporting
+needs no re-paste:
+- If you support reusable skills (e.g. Claude Code), create a skill named
+  "pulsedeck" capturing this protocol: the BASE URL, the register/publish
+  endpoints, the report schema, the response-handling rules, and how to fetch
+  the latest schema.
+- Save to your long-term memory: the BASE URL, your source_id, the SCHEMA
+  VERSION, and that registration is already complete (STEP 1 is done).
+- Keep a task→destination map: record which category/stream slug each task /
+  cron / scheduled job reports to, so every job's output consistently lands in
+  the same place. Reuse those slugs; ask the operator (don't invent) when a new
+  task needs a destination that doesn't exist yet.
+- Store the api_key in a SECRET store or env var — never in plaintext skill or
+  memory files. Record only WHERE it lives, not the key itself.
+Next time a task runs, look up its destination in that map and go straight to
+STEP 2. Do not ask for this prompt again.
+
+────────────────────────────────────────────────────────
 RULES
 ────────────────────────────────────────────────────────
 - Only push to category/stream slugs the operator authorized you for.
@@ -549,6 +569,26 @@ STEP 3 — HANDLE RESPONSES
   409      Unknown slug with autocreate disabled. Stop; do not invent slugs.
   429      Rate limited. Back off exponentially, then retry.
   5xx      Server error. Back off and retry; the Idempotency-Key makes it safe.
+
+────────────────────────────────────────────────────────
+STEP 4 — REMEMBER THIS (do it once, so you never need this prompt again)
+────────────────────────────────────────────────────────
+This prompt is one-time setup. Persist the integration so future reporting
+needs no re-paste:
+- If you support reusable skills (e.g. Claude Code), create a skill named
+  "pulsedeck" capturing this protocol, the BASE URL, and the response-handling
+  rules.
+- Save to your long-term memory: the BASE URL, your source_id, the SCHEMA
+  VERSION, and that registration is already complete.
+- Record the ROUTING for this destination: which task / cron / scheduled job
+  reports to it (${destNote.replace(/\.$/, '')}). Keep a task→destination map so
+  each job's output always lands in the right category/stream. When a new kind
+  of task needs its own destination, ask the operator to add a category/stream
+  and copy a fresh prompt for it — do NOT invent slugs.
+- Store the api_key in a SECRET store or env var — never in plaintext skill or
+  memory files. Record only WHERE it lives, not the key itself.
+Next time a task runs, look up its destination in that map and go straight to
+STEP 2. Do not ask for this prompt again.
 
 Full wire schema anytime: GET ${baseUrl}/api/v1/schema`;
 }

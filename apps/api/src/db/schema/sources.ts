@@ -33,6 +33,11 @@ export const sources = pgTable('sources', {
   scope: sourceScope('scope').notNull().default('workspace'),
   allowStreamAutocreate: boolean('allow_stream_autocreate').notNull().default(true),
   lastSeenAt: utcTimestamp('last_seen_at'),
+  // Set when an operator revokes the source. Distinguishes a deliberately
+  // disabled source from one that simply never completed the handshake (both
+  // have a null api_key_hash) so the UI can hide revoked agents by default.
+  // Re-registering or rotating a key clears it.
+  revokedAt: utcTimestamp('revoked_at'),
   createdAt: serverTimestamp('created_at'),
 });
 

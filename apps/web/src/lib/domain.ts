@@ -53,12 +53,13 @@ export const STATUS_DOT: Record<Status, string> = {
   unknown: 'bg-status-unknown',
 };
 
-/** Source health → badge variant + label (active / stale / never connected). */
+/** Source health → badge variant + label (active / stale / never / revoked). */
 export const SOURCE_STATUS: Record<
-  'active' | 'stale' | 'never',
+  'active' | 'stale' | 'never' | 'revoked',
   { variant: BadgeVariant; label: string }
 > = {
   active: { variant: 'healthy', label: 'Active' },
   stale: { variant: 'degraded', label: 'Stale' },
   never: { variant: 'unknown', label: 'Never connected' },
+  revoked: { variant: 'neutral', label: 'Revoked' },
 };

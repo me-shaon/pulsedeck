@@ -25,6 +25,8 @@ export function OverviewPage() {
   const { workspace } = useCurrentWorkspace();
   const reports = useReportsInfinite({ wsId: workspace.id, filters: {} });
   const sources = useSources(workspace.id);
+  // Revoked sources are disabled — keep them out of the at-a-glance summary.
+  const activeSources = (sources.data ?? []).filter((s) => s.status !== 'revoked');
 
   const loaded = reports.data?.pages.flatMap((p) => p.reports) ?? [];
   const recent = loaded.slice(0, 6);
@@ -150,10 +152,10 @@ export function OverviewPage() {
                   </>
                 ) : sources.isError ? (
                   <p className="text-xs text-muted-foreground">Couldn’t load sources.</p>
-                ) : (sources.data?.length ?? 0) === 0 ? (
+                ) : activeSources.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No sources connected yet.</p>
                 ) : (
-                  sources.data!.map((s) => {
+                  activeSources.map((s) => {
                     const meta = SOURCE_STATUS[s.status];
                     return (
                       <div key={s.id} className="flex items-center justify-between gap-2">
@@ -175,9 +177,9 @@ export function OverviewPage() {
                     );
                   })
                 )}
-                {sources.data && sources.data.length > 0 ? (
+                {activeSources.length > 0 ? (
                   <Mono className="mt-1 text-[0.625rem]">
-                    schema v{sources.data[0].schemaVersion}
+                    schema v{activeSources[0].schemaVersion}
                   </Mono>
                 ) : null}
               </CardContent>

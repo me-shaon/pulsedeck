@@ -1,0 +1,1 @@
+ALTER TABLE "sources" ADD COLUMN "revoked_at" timestamp with time zone;

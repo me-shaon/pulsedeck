@@ -363,7 +363,9 @@ describeIfDb('sources: registration & management (integration)', () => {
       headers: { cookie: adminCookie },
     });
     const row = list.json().sources.find((s: { id: string }) => s.id === sourceId);
-    expect(row).toMatchObject({ reportCount: 1 });
+    // Revoked status is distinct from a never-registered source (both have a
+    // null key hash) so the dashboard can hide revoked agents by default.
+    expect(row).toMatchObject({ reportCount: 1, status: 'revoked' });
   });
 
   // --- Re-issue + scope -----------------------------------------------------

@@ -33,17 +33,24 @@ export const SOURCE_RECENT_WINDOW_MS = 15 * 60 * 1000;
 
 export type SourceScope = Source['scope'];
 
-export type SourceHealth = 'active' | 'stale' | 'never';
+export type SourceHealth = 'active' | 'stale' | 'never' | 'revoked';
 
 /** A Drizzle transaction handle (the argument to `db.transaction`). */
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-/** Derive the connected-agent health badge from key presence + last-seen time. */
+/**
+ * Derive the connected-agent health badge. `revoked` (operator disabled the
+ * source) takes precedence over key/last-seen state so a deliberately revoked
+ * agent is never shown as merely "never connected" — both have a null key hash,
+ * but only a revoked one has `revokedAt`.
+ */
 export function sourceHealth(
   apiKeyHash: string | null,
   lastSeenAt: Date | null,
   now: number = Date.now(),
+  revokedAt: Date | null = null,
 ): SourceHealth {
+  if (revokedAt) return 'revoked';
   if (!apiKeyHash) return 'never'; // created but never completed the handshake
   if (lastSeenAt && now - lastSeenAt.getTime() <= SOURCE_RECENT_WINDOW_MS) return 'active';
   return 'stale';
@@ -273,19 +280,26 @@ export async function updateSource(
  */
 export async function rotateApiKey(db: Db, sourceId: string): Promise<string> {
   const rawKey = generateApiKey();
+  // Rotating a key re-enables a revoked source (it hands out a working key).
   await db
     .update(sources)
-    .set({ apiKeyHash: hashToken(rawKey) })
+    .set({ apiKeyHash: hashToken(rawKey), revokedAt: null })
     .where(eq(sources.id, sourceId));
   return rawKey;
 }
 
 /**
- * Revoke a source's API key by nulling its hash. The source row and its report
- * history remain; subsequent pushes with the old key fail bearer auth (401).
+ * Revoke a source: null its API-key hash AND stamp `revoked_at`. The source row
+ * and its report history remain; subsequent pushes with the old key fail bearer
+ * auth (401). The timestamp marks the source as deliberately disabled (distinct
+ * from never-registered), so the dashboard can hide it by default. Re-issuing a
+ * token + re-registering, or rotating a key, clears the mark.
  */
 export async function revokeApiKey(db: Db, sourceId: string): Promise<void> {
-  await db.update(sources).set({ apiKeyHash: null }).where(eq(sources.id, sourceId));
+  await db
+    .update(sources)
+    .set({ apiKeyHash: null, revokedAt: new Date() })
+    .where(eq(sources.id, sourceId));
 }
 
 export type RegisterResult =
@@ -338,6 +352,8 @@ export async function registerSource(
       // Registration is the agent's first contact → seed last-seen so the
       // connected-agents view shows it `active` immediately.
       lastSeenAt: new Date(),
+      // Re-registering a previously revoked source re-enables it.
+      revokedAt: null,
     };
     if (meta.agentVersion) patch.agentVersion = meta.agentVersion;
 
@@ -381,7 +397,7 @@ export async function listSources(db: Db, workspaceId: string): Promise<SourceLi
     schemaVersion: SCHEMA_VERSION,
     lastSeenAt: s.lastSeenAt,
     reportCount: counts.get(s.id) ?? 0,
-    status: sourceHealth(s.apiKeyHash, s.lastSeenAt, now),
+    status: sourceHealth(s.apiKeyHash, s.lastSeenAt, now, s.revokedAt),
   }));
 }
 

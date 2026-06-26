@@ -11,7 +11,7 @@ import type { Block, Severity } from '@pulsedeck/schema';
 
 export type Role = 'owner' | 'admin' | 'editor' | 'viewer';
 export type SourceScope = 'workspace' | 'category' | 'stream';
-export type SourceStatus = 'active' | 'stale' | 'never';
+export type SourceStatus = 'active' | 'stale' | 'never' | 'revoked';
 
 export type SignupMode = 'setup' | 'open' | 'invite';
 

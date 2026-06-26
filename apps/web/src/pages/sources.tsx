@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { KeyRound, MoreHorizontal, Plus, Radio, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  MoreHorizontal,
+  Plus,
+  Radio,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import type { Source, SourceScope } from '@/lib/api-types';
 import { createSource, reissueToken, revokeSource, rotateKey } from '@/lib/api';
 import { queryClient, queryKeys } from '@/lib/query-client';
@@ -52,6 +61,13 @@ export function SourcesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [secret, setSecret] = useState<SecretRevealData | null>(null);
   const [confirm, setConfirm] = useState<{ source: Source } | null>(null);
+  const [showRevoked, setShowRevoked] = useState(false);
+
+  // Revoked sources are deliberately disabled — hide them by default so the
+  // list shows live agents, with a toggle to reveal them when needed.
+  const all = sources.data ?? [];
+  const revokedCount = all.filter((s) => s.status === 'revoked').length;
+  const visible = showRevoked ? all : all.filter((s) => s.status !== 'revoked');
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.sources(workspace.id) });
@@ -112,7 +128,7 @@ export function SourcesPage() {
         <SkeletonRows rows={4} />
       ) : sources.isError ? (
         <ErrorState error={sources.error} onRetry={() => sources.refetch()} />
-      ) : sources.data.length === 0 ? (
+      ) : all.length === 0 ? (
         <EmptyState
           icon={Radio}
           title="No sources yet"
@@ -127,7 +143,27 @@ export function SourcesPage() {
         />
       ) : (
         <div className="flex flex-col gap-2">
-          {sources.data.map((source) => {
+          {revokedCount > 0 ? (
+            <div className="flex items-center justify-between gap-2 px-1 pb-1">
+              <span className="text-[0.6875rem] text-muted-foreground">
+                {showRevoked
+                  ? `Showing ${revokedCount} revoked ${revokedCount === 1 ? 'source' : 'sources'}.`
+                  : `${revokedCount} revoked ${revokedCount === 1 ? 'source' : 'sources'} hidden.`}
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setShowRevoked((v) => !v)}>
+                {showRevoked ? (
+                  <>
+                    <EyeOff className="size-3.5" /> Hide revoked
+                  </>
+                ) : (
+                  <>
+                    <Eye className="size-3.5" /> Show revoked
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : null}
+          {visible.map((source) => {
             const meta = SOURCE_STATUS[source.status];
             return (
               <div
@@ -195,12 +231,14 @@ export function SourcesPage() {
                       >
                         <RefreshCw className="size-4" /> Rotate API key
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => setConfirm({ source })}
-                        className="text-severity-critical"
-                      >
-                        <Trash2 className="size-4" /> Revoke
-                      </DropdownMenuItem>
+                      {source.status !== 'revoked' ? (
+                        <DropdownMenuItem
+                          onSelect={() => setConfirm({ source })}
+                          className="text-severity-critical"
+                        >
+                          <Trash2 className="size-4" /> Revoke
+                        </DropdownMenuItem>
+                      ) : null}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}

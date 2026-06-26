@@ -218,12 +218,13 @@ export interface Tree {
   categories: TreeCategory[];
 }
 
-/** Response of the destination-scoped agent-instructions endpoints. */
+/**
+ * Response of the destination-scoped agent-instructions endpoints — a task
+ * brief for an already-onboarded agent (no registration token or schema; the
+ * protocol is taught once by the source setup prompt).
+ */
 export interface AgentInstructions {
-  registrationToken: string;
   setupPrompt: string;
-  schema: unknown;
-  baseUrlNote?: string;
 }
 
 // --- Dashboards & widgets (Phase 9) -------------------------------------

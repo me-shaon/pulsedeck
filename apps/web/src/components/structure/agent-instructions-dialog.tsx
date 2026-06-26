@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import {
   Dialog,
@@ -157,20 +157,10 @@ export function AgentInstructionsDialog({
               </Button>
             ) : (
               <>
-                {result.baseUrlNote ? (
-                  <div className="flex items-start gap-2 rounded-md border border-[var(--severity-warning)]/40 bg-[var(--tint-amber-bg)] px-3 py-2 text-xs">
-                    <AlertTriangle
-                      className="mt-0.5 size-4 shrink-0 text-severity-warning"
-                      aria-hidden
-                    />
-                    <span className="text-foreground">{result.baseUrlNote}</span>
-                  </div>
-                ) : null}
-
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
-                      Agent prompt
+                      Task brief
                     </span>
                     <CopyButton value={result.setupPrompt} label="Copy prompt" size="sm" />
                   </div>
@@ -179,7 +169,8 @@ export function AgentInstructionsDialog({
                   </pre>
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[0.6875rem] text-muted-foreground">
-                      Contains a one-time registration token — expires in 24h.
+                      Assumes the agent is already set up. The full protocol lives in the source
+                      setup prompt.
                     </p>
                     <Button
                       variant="ghost"

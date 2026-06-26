@@ -406,12 +406,6 @@ export async function listSources(db: Db, workspaceId: string): Promise<SourceLi
 export const AGENT_UPDATES_CATEGORY_SLUG = 'agent-updates';
 export const AGENT_UPDATES_CATEGORY_NAME = 'Agent updates';
 
-/** Condense a multi-line task to one short phrase for the setup-confirmation line. */
-function summarizeTask(task: string): string {
-  const firstLine = task.trim().split('\n')[0].trim();
-  return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
-}
-
 /** Pick a stream slug free within `categoryId`, deduping `base` with `-2`, `-3`… */
 async function uniqueStreamSlug(tx: Tx, categoryId: string, base: string): Promise<string> {
   const rows = await tx
@@ -636,32 +630,25 @@ export type InstructionDestination =
   | { categorySlug: string; streamSlug?: undefined };
 
 /**
- * Render a destination-scoped variant of {@link buildSetupPrompt}: STEP 2's body
- * has the chosen category (and, for a stream-level destination, stream) slug
- * pre-filled, so the operator pastes it into an agent and is done. Category-level
- * leaves the stream choice to the agent (autocreate is on).
+ * Render a destination-scoped TASK BRIEF. The protocol itself (register,
+ * publish, schema, response handling, the agent-updates status lane) is taught
+ * once by {@link buildSetupPrompt}, so this prompt assumes an already-onboarded
+ * agent and carries only what's specific to this assignment: the task and the
+ * findings destination, plus a note to persist the task→destination routing so
+ * future runs of the same instruction reuse the same category/stream.
  */
 export interface DestinationPromptOptions {
   /** Operator's free-text task instruction; rendered verbatim, never stored. */
   task?: string;
-  /** Slug of this source's stream in the "agent-updates" lane (see {@link ensureAgentUpdatesDestination}). */
-  statusStreamSlug: string;
 }
 
 export function buildDestinationSetupPrompt(
-  baseUrl: string,
-  regToken: string,
   dest: InstructionDestination,
-  opts: DestinationPromptOptions,
+  opts: DestinationPromptOptions = {},
 ): string {
-  const statusSlug = opts.statusStreamSlug;
-  const categoryLine = `"category": { "slug": "${dest.categorySlug}" },`;
-  const streamLine = dest.streamSlug
-    ? `"stream":   { "slug": "${dest.streamSlug}" },`
-    : `"stream":   { "slug": "<choose or create a stream under '${dest.categorySlug}'>" },`;
   const destNote = dest.streamSlug
-    ? `Push every report to category "${dest.categorySlug}", stream "${dest.streamSlug}".`
-    : `Push reports to category "${dest.categorySlug}"; choose or create a stream slug per report.`;
+    ? `category "${dest.categorySlug}", stream "${dest.streamSlug}"`
+    : `category "${dest.categorySlug}" (choose or create a stream slug per report)`;
 
   const task = opts.task?.trim();
   const taskSection = task
@@ -673,102 +660,13 @@ ${task}
 `
     : '';
 
-  return `You are integrated with PulseDeck, a reporting platform. Publish your structured
-results to it by following this protocol exactly.
+  return `PulseDeck task assignment. You are already set up — use your existing
+"pulsedeck" skill / saved protocol and stored api_key to publish. (If you have
+NOT set up PulseDeck yet, run the source setup prompt first.)
 
-${taskSection}Report your FINDINGS to:  ${destNote}
-Report your OWN STATUS to: category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusSlug}".
+${taskSection}Report the findings from this task to: ${destNote}.
 
-BASE URL: ${baseUrl}
-
-SCHEMA VERSION: ${SCHEMA_VERSION}   # current wire-contract version
-
-────────────────────────────────────────────────────────
-STEP 1 — REGISTER (one time only)
-────────────────────────────────────────────────────────
-You have a one-time registration token (expires in 24h):
-  REGISTRATION_TOKEN: ${regToken}
-
-Call:
-  POST ${baseUrl}/api/v1/sources/register
-  Header: X-Registration-Token: ${regToken}
-  Body:   { "agent_version": "<your version>" }
-
-Response:
-  { "source_id": "src_...", "api_key": "pd_...", "schema": { ... } }
-
-Store api_key securely. The registration token is now dead — never reuse it.
-
-────────────────────────────────────────────────────────
-STEP 2 — PUBLISH A REPORT
-────────────────────────────────────────────────────────
-  POST ${baseUrl}/api/v1/reports
-  Header: Authorization: Bearer <api_key>
-  Header: Idempotency-Key: <unique id you generate per report>
-  Body:
-
-  {
-    "version": "${SCHEMA_VERSION}",
-    "source": { "id": "<source_id>" },
-    ${categoryLine}
-    ${streamLine}
-    "report": {
-      "title": "...",
-      "summary": "...",
-      "severity": "info | warning | critical",
-      "occurred_at": "<ISO 8601 UTC>",
-      "tags": ["..."]
-    },
-    "blocks": [ ... see schema; each block needs a unique "id" ... ]
-  }
-
-Reuse the SAME Idempotency-Key only when retrying the SAME report.
-
-────────────────────────────────────────────────────────
-STEP 3 — HANDLE RESPONSES
-────────────────────────────────────────────────────────
-  200/201  Success.
-  422      Validation failed. Read "issues[]", fix named fields, retry ONCE.
-  401      API key invalid/revoked. Stop; ask the operator to re-register.
-  403      Not allowed to write there. Stop, tell the operator.
-  409      Unknown slug with autocreate disabled. Stop; do not invent slugs.
-  429      Rate limited. Back off exponentially, then retry.
-  5xx      Server error. Back off and retry; the Idempotency-Key makes it safe.
-
-────────────────────────────────────────────────────────
-AGENT STATUS — category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "${statusSlug}"
-────────────────────────────────────────────────────────
-This is your own operational lane, separate from your findings. Report YOUR
-state here; report what you observe to the destination above. Never mix them: a
-monitored thing failing is a FINDING; YOU being unable to run is a STATUS update.
-
-Right after STEP 1 registers you, publish one setup-confirmation here
-(severity: info — "setup complete${task ? ' — I will ' + summarizeTask(task) : ''}").
-After that, post here ONLY on these events (routine results stay findings):
-  - you cannot run the task ... critical  (crash, exception, network down, bad target creds)
-  - partial failure .......... warning   (ran, but some sub-tasks couldn't execute)
-  - recovered ................ info      (first good run after a failure)
-  - your own creds expiring .. warning   (a token/key YOUR task needs — not the PulseDeck key)
-
-────────────────────────────────────────────────────────
-STEP 4 — REMEMBER THIS (do it once, so you never need this prompt again)
-────────────────────────────────────────────────────────
-This prompt is one-time setup. Persist the integration so future reporting
-needs no re-paste:
-- If you support reusable skills (e.g. Claude Code), create a skill named
-  "pulsedeck" capturing this protocol, the BASE URL, and the response-handling
-  rules.
-- Save to your long-term memory: the BASE URL, your source_id, the SCHEMA
-  VERSION, and that registration is already complete.
-- Record the ROUTING for this destination: which task / cron / scheduled job
-  reports to it (${destNote.replace(/\.$/, '')}). Keep a task→destination map so
-  each job's output always lands in the right category/stream. When a new kind
-  of task needs its own destination, ask the operator to add a category/stream
-  and copy a fresh prompt for it — do NOT invent slugs.
-- Store the api_key in a SECRET store or env var — never in plaintext skill or
-  memory files. Record only WHERE it lives, not the key itself.
-Next time a task runs, look up its destination in that map and go straight to
-STEP 2. Do not ask for this prompt again.
-
-Full wire schema anytime: GET ${baseUrl}/api/v1/schema`;
+REMEMBER THIS ROUTING: record in your pulsedeck skill / long-term memory that
+this task → ${destNote}. Every future run of this same instruction must report
+to the SAME destination. Reuse these slugs; never invent new ones.`;
 }

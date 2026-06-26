@@ -1,4 +1,3 @@
-import { getSchemaInfo } from '@pulsedeck/schema';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -15,11 +14,7 @@ import {
   reorderStreams,
   type StructureError,
 } from '../services/structure.js';
-import {
-  buildDestinationSetupPrompt,
-  ensureAgentUpdatesDestination,
-  reissueRegistrationToken,
-} from '../services/sources.js';
+import { buildDestinationSetupPrompt } from '../services/sources.js';
 
 /**
  * Manual category/stream management + destination-scoped agent instructions
@@ -27,8 +22,12 @@ import {
  *
  * RBAC reuses existing actions: category/stream CRUD + reorder need
  * `categories:create` / `streams:create` (owner/admin/editor); the
- * agent-instructions endpoints mint a registration token, so they require
- * `sources:manage` (owner/admin) — the same tier as source setup.
+ * agent-instructions endpoints render a task brief for an existing source, so
+ * they require `sources:manage` (owner/admin) — the same tier as source setup.
+ *
+ * The task brief assumes the agent was already onboarded by the source setup
+ * prompt (which teaches the protocol + status lane), so this carries only the
+ * task and its findings destination — no registration token or schema.
  *
  * NOTE: the literal `/reorder` routes are registered BEFORE the `/:categoryId`
  * and `/:streamId` param routes so Fastify matches the static segment first.
@@ -47,10 +46,6 @@ const InstrQuery = z.object({
   task: z.string().max(4000).optional(),
 });
 
-const BASE_URL_PLACEHOLDER = 'https://your-pulsedeck-host.example';
-const BASE_URL_NOTE =
-  'BETTER_AUTH_URL is not configured; the prompt uses a placeholder base URL. Set it and re-generate the instructions.';
-
 function statusForError(e: StructureError): number {
   if (e === 'slug_exists') return 409;
   if (e === 'not_found') return 404;
@@ -64,13 +59,6 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
   const manageCategories = [requireAuth, makeRequireWorkspaceRole(db, 'categories:create')];
   const manageStreams = [requireAuth, makeRequireWorkspaceRole(db, 'streams:create')];
   const manageSources = [requireAuth, makeRequireWorkspaceRole(db, 'sources:manage')];
-
-  function resolveBaseUrl(): { baseUrl: string; isPlaceholder: boolean } {
-    const configured = app.authEnv.BETTER_AUTH_URL;
-    return configured
-      ? { baseUrl: configured, isPlaceholder: false }
-      : { baseUrl: BASE_URL_PLACEHOLDER, isPlaceholder: true };
-  }
 
   async function loadWsSource(workspaceId: string, sourceId: string): Promise<Source | null> {
     const [s] = await db
@@ -207,22 +195,14 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!row) return reply.code(404).send({ error: 'Stream not found' });
       const source = await loadWsSource(workspaceId, q.data.sourceId);
       if (!source) return reply.code(404).send({ error: 'Source not found' });
-      // A revoked agent is disabled; don't mint it a fresh registration token.
+      // A revoked agent is disabled; don't hand it new work.
       if (source.revokedAt) return reply.code(409).send({ error: 'Source is revoked' });
 
-      const { baseUrl, isPlaceholder } = resolveBaseUrl();
-      const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
-      const regToken = await reissueRegistrationToken(db, source.id, req.user!.id);
       return reply.send({
-        registrationToken: regToken,
         setupPrompt: buildDestinationSetupPrompt(
-          baseUrl,
-          regToken,
           { categorySlug: row.categorySlug, streamSlug: row.streamSlug },
-          { task: q.data.task, statusStreamSlug },
+          { task: q.data.task },
         ),
-        schema: getSchemaInfo(),
-        ...(isPlaceholder ? { baseUrlNote: BASE_URL_NOTE } : {}),
       });
     },
   );
@@ -242,22 +222,11 @@ export async function structureRoutes(app: FastifyInstance): Promise<void> {
       if (!cat) return reply.code(404).send({ error: 'Category not found' });
       const source = await loadWsSource(workspaceId, q.data.sourceId);
       if (!source) return reply.code(404).send({ error: 'Source not found' });
-      // A revoked agent is disabled; don't mint it a fresh registration token.
+      // A revoked agent is disabled; don't hand it new work.
       if (source.revokedAt) return reply.code(409).send({ error: 'Source is revoked' });
 
-      const { baseUrl, isPlaceholder } = resolveBaseUrl();
-      const { streamSlug: statusStreamSlug } = await ensureAgentUpdatesDestination(db, source);
-      const regToken = await reissueRegistrationToken(db, source.id, req.user!.id);
       return reply.send({
-        registrationToken: regToken,
-        setupPrompt: buildDestinationSetupPrompt(
-          baseUrl,
-          regToken,
-          { categorySlug: cat.slug },
-          { task: q.data.task, statusStreamSlug },
-        ),
-        schema: getSchemaInfo(),
-        ...(isPlaceholder ? { baseUrlNote: BASE_URL_NOTE } : {}),
+        setupPrompt: buildDestinationSetupPrompt({ categorySlug: cat.slug }, { task: q.data.task }),
       });
     },
   );

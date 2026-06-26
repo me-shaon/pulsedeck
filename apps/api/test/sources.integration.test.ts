@@ -1,4 +1,4 @@
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, eq, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,11 +10,14 @@ import {
   createDrizzle,
   id,
   reports,
+  sourceCategories,
   sourceRegistrationTokens,
+  sourceStreams,
   sources,
   streams,
   type Db,
 } from '../src/db/index.js';
+import { AGENT_UPDATES_CATEGORY_SLUG } from '../src/services/sources.js';
 import type { Sql } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { buildServer } from '../src/server.js';
@@ -147,6 +150,57 @@ describeIfDb('sources: registration & management (integration)', () => {
     expect(body.setupPrompt).toContain('category "agent-updates", stream "hermes-prod"');
     expect(body.setupPrompt).toContain('AGENT STATUS');
     expect(body.schema.version).toBe('1.0');
+  });
+
+  it('Creating a source provisions the agent-updates lane + grants', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${workspaceId}/sources`,
+      headers: { cookie: adminCookie },
+      payload: { name: 'Lane Probe' },
+    });
+    const created = res.json().source;
+
+    const [sysCat] = await db
+      .select()
+      .from(categories)
+      .where(
+        and(
+          eq(categories.workspaceId, workspaceId),
+          eq(categories.slug, AGENT_UPDATES_CATEGORY_SLUG),
+        ),
+      );
+    expect(sysCat.system).toBe(true);
+    const [stm] = await db
+      .select()
+      .from(streams)
+      .where(and(eq(streams.categoryId, sysCat.id), eq(streams.slug, 'lane-probe')));
+    expect(stm).toBeTruthy();
+    // Both grants present so the lane is writable under any source scope.
+    const sGrant = await db
+      .select()
+      .from(sourceStreams)
+      .where(and(eq(sourceStreams.sourceId, created.id), eq(sourceStreams.streamId, stm.id)));
+    expect(sGrant.length).toBe(1);
+    const cGrant = await db
+      .select()
+      .from(sourceCategories)
+      .where(
+        and(eq(sourceCategories.sourceId, created.id), eq(sourceCategories.categoryId, sysCat.id)),
+      );
+    expect(cGrant.length).toBe(1);
+
+    // Re-issuing a token reuses the same status stream (no -2 duplicate).
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/workspaces/${workspaceId}/sources/${created.id}/tokens`,
+      headers: { cookie: adminCookie },
+    });
+    const streamsForProbe = await db
+      .select()
+      .from(streams)
+      .where(and(eq(streams.categoryId, sysCat.id), eq(streams.slug, 'lane-probe')));
+    expect(streamsForProbe.length).toBe(1);
   });
 
   it('Editor cannot create a source (403)', async () => {

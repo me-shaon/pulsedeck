@@ -3,15 +3,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuth, type Auth, type AuthEnv } from '../src/auth/auth.js';
 import { and, eq } from 'drizzle-orm';
-import {
-  categories,
-  createDrizzle,
-  id,
-  sourceCategories,
-  sourceStreams,
-  streams,
-  type Db,
-} from '../src/db/index.js';
+import { categories, createDrizzle, id, streams, type Db } from '../src/db/index.js';
 import { AGENT_UPDATES_CATEGORY_SLUG } from '../src/services/sources.js';
 import type { Sql } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
@@ -338,9 +330,10 @@ describeIfDb('structure: manual category/stream management (integration)', () =>
       headers: { cookie: adminCookie },
     });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json().setupPrompt).toContain('"slug": "system-health"');
-    expect(ok.json().setupPrompt).toContain('"slug": "infra-i"');
-    expect(typeof ok.json().registrationToken).toBe('string');
+    // Brief task brief: findings routing only, no onboarding protocol/token.
+    expect(ok.json().setupPrompt).toContain('category "infra-i", stream "system-health"');
+    expect(ok.json().registrationToken).toBeUndefined();
+    expect(ok.json().setupPrompt).not.toContain('STEP 1');
 
     const denied = await app.inject({
       method: 'GET',
@@ -373,107 +366,8 @@ describeIfDb('structure: manual category/stream management (integration)', () =>
       headers: { cookie: adminCookie },
     });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json().setupPrompt).toContain('"slug": "cat-level"');
+    expect(ok.json().setupPrompt).toContain('category "cat-level"');
     expect(ok.json().setupPrompt).toContain('choose or create a stream');
-  });
-
-  // --- Agent updates lane ---------------------------------------------------
-
-  it('route: generating instructions provisions the agent-updates lane + grants', async () => {
-    const cat = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/categories`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Lane Cat', slug: 'lane-cat' },
-      })
-    ).json().category;
-    const src = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/sources`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Uptime Bot' },
-      })
-    ).json().source;
-
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/v1/workspaces/${workspaceId}/categories/${cat.id}/agent-instructions?sourceId=${src.id}`,
-      headers: { cookie: adminCookie },
-    });
-    expect(res.statusCode).toBe(200);
-    // The prompt routes status to agent-updates/<agent-slug>.
-    expect(res.json().setupPrompt).toContain(
-      `category "${AGENT_UPDATES_CATEGORY_SLUG}", stream "uptime-bot"`,
-    );
-
-    // System category exists once, with a per-agent stream + both grants.
-    const [sysCat] = await db
-      .select()
-      .from(categories)
-      .where(
-        and(
-          eq(categories.workspaceId, workspaceId),
-          eq(categories.slug, AGENT_UPDATES_CATEGORY_SLUG),
-        ),
-      );
-    expect(sysCat.system).toBe(true);
-    const [stm] = await db
-      .select()
-      .from(streams)
-      .where(and(eq(streams.categoryId, sysCat.id), eq(streams.slug, 'uptime-bot')));
-    expect(stm).toBeTruthy();
-    const sGrant = await db
-      .select()
-      .from(sourceStreams)
-      .where(and(eq(sourceStreams.sourceId, src.id), eq(sourceStreams.streamId, stm.id)));
-    expect(sGrant.length).toBe(1);
-    const cGrant = await db
-      .select()
-      .from(sourceCategories)
-      .where(
-        and(eq(sourceCategories.sourceId, src.id), eq(sourceCategories.categoryId, sysCat.id)),
-      );
-    expect(cGrant.length).toBe(1);
-  });
-
-  it('route: regenerating instructions reuses the same status stream (idempotent)', async () => {
-    const src = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/sources`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Stable Bot' },
-      })
-    ).json().source;
-    const cat = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/categories`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Stable Cat', slug: 'stable-cat' },
-      })
-    ).json().category;
-    const url = `/api/v1/workspaces/${workspaceId}/categories/${cat.id}/agent-instructions?sourceId=${src.id}`;
-
-    await app.inject({ method: 'GET', url, headers: { cookie: adminCookie } });
-    await app.inject({ method: 'GET', url, headers: { cookie: adminCookie } });
-
-    const [sysCat] = await db
-      .select()
-      .from(categories)
-      .where(
-        and(
-          eq(categories.workspaceId, workspaceId),
-          eq(categories.slug, AGENT_UPDATES_CATEGORY_SLUG),
-        ),
-      );
-    const streamsForBot = await db
-      .select()
-      .from(streams)
-      .where(and(eq(streams.categoryId, sysCat.id), eq(streams.slug, 'stable-bot')));
-    expect(streamsForBot.length).toBe(1); // not re-minted as stable-bot-2
   });
 
   it('route: task text is woven into the generated prompt', async () => {
@@ -536,26 +430,12 @@ describeIfDb('structure: manual category/stream management (integration)', () =>
   });
 
   it('route: the system agent-updates category cannot be renamed or deleted', async () => {
-    const src = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/sources`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Lock Bot' },
-      })
-    ).json().source;
-    const cat = (
-      await app.inject({
-        method: 'POST',
-        url: `/api/v1/workspaces/${workspaceId}/categories`,
-        headers: { cookie: adminCookie },
-        payload: { name: 'Lock Cat', slug: 'lock-cat' },
-      })
-    ).json().category;
+    // Creating a source provisions the workspace's agent-updates lane.
     await app.inject({
-      method: 'GET',
-      url: `/api/v1/workspaces/${workspaceId}/categories/${cat.id}/agent-instructions?sourceId=${src.id}`,
+      method: 'POST',
+      url: `/api/v1/workspaces/${workspaceId}/sources`,
       headers: { cookie: adminCookie },
+      payload: { name: 'Lock Bot' },
     });
     const [sysCat] = await db
       .select()

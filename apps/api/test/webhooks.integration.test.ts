@@ -359,6 +359,32 @@ describeIfDb('webhooks (integration)', () => {
     expect(row.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('reclaims an orphaned "delivering" row whose claim lease expired', async () => {
+    // Simulate a delivery the runner claimed (status=delivering) but never
+    // finalized — process crashed mid-send, or a finalize write failed. Its lease
+    // (next_attempt_at) is long past, so the next poll must reclaim and retry it
+    // rather than leaving it stranded in `delivering` forever.
+    const report = await insertReport({ severity: 'critical' });
+    const deliveryId = id('whd');
+    await db.insert(webhookDeliveries).values({
+      id: deliveryId,
+      webhookId,
+      reportId: report.id,
+      maxAttempts: 5,
+      payload: { event: 'report.created', deliveryId },
+      status: 'delivering',
+      nextAttemptAt: new Date(Date.now() - 60_000),
+    });
+    calls.length = 0;
+    nextStatus = 200;
+    await runner.runOnce();
+    const [row] = await db
+      .select()
+      .from(webhookDeliveries)
+      .where(eq(webhookDeliveries.id, deliveryId));
+    expect(row.status).toBe('success');
+  });
+
   it('delivery log lists attempts; redeliver re-queues a terminal row', async () => {
     const log = await app.inject({
       method: 'GET',

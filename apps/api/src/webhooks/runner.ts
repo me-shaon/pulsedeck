@@ -17,10 +17,15 @@ import type { ClaimedDelivery } from './types.js';
  * replicas deliver in parallel with no double-send — unlike retention's single
  * advisory lock, here we WANT parallelism), POSTs each, and records the result.
  *
- * Delivery lifecycle (the claim only ever sees `pending` + due rows):
+ * Delivery lifecycle (claim sees due `pending` rows and lease-expired `delivering`
+ * rows — the latter are orphans from a crash or failed finalize):
  *   pending --claim--> delivering --2xx-------> success   (terminal)
  *                                 \--retryable-> pending   (next_attempt_at pushed out)
  *                                 \--exhausted-> failed    (terminal, never reclaimed)
+ *                                 \--orphaned--> delivering (lease expires → reclaimed)
+ *
+ * On claim, `next_attempt_at` is set to a lease (`claimLeaseMs`) in the future; a
+ * finalize overwrites it, so only a delivery that never finalizes stays claimable.
  */
 
 /** Backoff schedule between attempts; the last entry repeats. */
@@ -60,6 +65,16 @@ export interface WebhookRunnerOptions {
   fetchImpl?: typeof fetch;
   /** Injectable jitter in [0,1) — tests pin it; defaults to crypto-free Math.random. */
   jitter?: () => number;
+  /**
+   * Claim lease / visibility timeout (ms). On claim a row's `next_attempt_at` is
+   * pushed out by this much; a delivery that finalizes (success/retry/failed)
+   * overwrites it, but one that never finalizes — process crash mid-send, or a
+   * failed finalize write — becomes due again after the lease and is reclaimed by
+   * a later poll instead of being stranded in `delivering` forever. Must exceed
+   * `deliveryTimeoutMs` so an in-flight delivery is never reclaimed under it.
+   * Defaults to 5 minutes.
+   */
+  claimLeaseMs?: number;
 }
 
 export interface WebhookRunner {
@@ -84,6 +99,7 @@ export function createWebhookRunner(opts: WebhookRunnerOptions): WebhookRunner {
     // inject a fake; the dispatcher/redirect guards no-op around it.
     fetchImpl = undiciFetch as unknown as typeof fetch,
     jitter = Math.random,
+    claimLeaseMs = 300_000,
   } = opts;
   const initialDelayMs = opts.initialDelayMs ?? Math.min(pollIntervalMs, 5000);
 
@@ -129,15 +145,23 @@ export function createWebhookRunner(opts: WebhookRunnerOptions): WebhookRunner {
         .from(webhookDeliveries)
         .innerJoin(webhooks, eq(webhooks.id, webhookDeliveries.webhookId))
         .where(
-          and(eq(webhookDeliveries.status, 'pending'), lte(webhookDeliveries.nextAttemptAt, now())),
+          and(
+            // `pending` = ready to send; `delivering` past its lease = orphaned by
+            // a crash or failed finalize, reclaimed here rather than stranded.
+            inArray(webhookDeliveries.status, ['pending', 'delivering']),
+            lte(webhookDeliveries.nextAttemptAt, now()),
+          ),
         )
         .orderBy(asc(webhookDeliveries.nextAttemptAt))
         .limit(batchSize)
         .for('update', { skipLocked: true });
       if (rows.length === 0) return [];
+      // Mark delivering and push the lease out: a finalize overwrites this; an
+      // orphaned delivery becomes due again after `claimLeaseMs` for a later poll.
+      const lease = new Date(now().getTime() + claimLeaseMs);
       await tx
         .update(webhookDeliveries)
-        .set({ status: 'delivering' })
+        .set({ status: 'delivering', nextAttemptAt: lease })
         .where(
           inArray(
             webhookDeliveries.id,

@@ -6,6 +6,7 @@ import { createDrizzle } from './db/index.js';
 import { loadEnv, type Env } from './env.js';
 import { runMigrations } from './migrate.js';
 import { buildServer } from './server.js';
+import { resolveEmailPort } from './services/email-smtp.js';
 
 async function main(): Promise<void> {
   let env: Env;
@@ -22,7 +23,12 @@ async function main(): Promise<void> {
   await runMigrations(sql);
 
   const db = createDrizzle(sql);
-  const auth = createAuth(db, env);
+  const runtime = buildRuntimeConfig(env);
+  // Resolve the email port from runtime (SMTP when configured, else console
+  // no-op) and share it between the auth password-reset callback and the server's
+  // `app.email` seam so a single configured provider drives both.
+  const email = resolveEmailPort({ runtime });
+  const auth = createAuth(db, env, { email });
 
   // Headless first-run: seed the admin + workspace when BOOTSTRAP_* is set and
   // there are zero users. Idempotent (no-op once any user exists).
@@ -33,9 +39,10 @@ async function main(): Promise<void> {
     logger: true,
     env,
     auth,
+    email,
     redisUrl: env.REDIS_URL,
     sseEnabled: env.SSE_ENABLED,
-    runtime: buildRuntimeConfig(env),
+    runtime,
     retentionDays: env.RETENTION_DAYS,
     retentionSweepIntervalMs: env.RETENTION_SWEEP_INTERVAL_MS,
   });

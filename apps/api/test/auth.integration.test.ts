@@ -84,6 +84,7 @@ describeIfDb('auth + onboarding + RBAC (integration)', () => {
       setupRequired: true,
       signupMode: 'setup',
       billingEnabled: false,
+      emailConfigured: false,
     });
   });
 

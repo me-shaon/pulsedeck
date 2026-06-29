@@ -22,6 +22,12 @@ export interface AuthConfig {
   signupMode: SignupMode;
   /** Whether billing UI is active. OSS → false (hide all billing/usage UI). */
   billingEnabled: boolean;
+  /**
+   * Whether transactional email can be delivered (SMTP configured). Drives the
+   * forgot-password warning and the admin "email not configured" banner; password
+   * reset + invite emails don't actually send until this is true.
+   */
+  emailConfigured: boolean;
 }
 
 /**

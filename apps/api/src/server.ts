@@ -20,7 +20,8 @@ import { structureRoutes } from './routes/structure.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { workspaceRoutes } from './routes/workspaces.js';
 import { createRetentionRunner, type RetentionRunner } from './retention/index.js';
-import { createConsoleEmailPort, type EmailPort } from './services/email.js';
+import { type EmailPort } from './services/email.js';
+import { resolveEmailPort } from './services/email-smtp.js';
 import {
   createEnqueuer,
   createWebhookRunner,
@@ -126,7 +127,12 @@ export function buildServer({
   const app = Fastify({ logger, trustProxy: runtime.trustProxy });
 
   const dbInstance = db ?? createDrizzle(sql);
-  const authInstance = auth ?? createAuth(dbInstance, env);
+  // Resolve the email port once: an injected port wins (cloud / tests); otherwise
+  // derive from runtime (SMTP when configured, else the console no-op). The same
+  // port backs both the auth password-reset callback and the `app.email` seam.
+  const emailPort =
+    email ?? resolveEmailPort({ runtime, logger: { info: (o, m) => app.log.info(o, m) } });
+  const authInstance = auth ?? createAuth(dbInstance, env, { email: emailPort });
 
   // Shared rate-limit store. With Redis the limits hold ACROSS replicas (and
   // survive restarts); without it each node counts independently in memory.
@@ -154,8 +160,9 @@ export function buildServer({
   app.decorate('runtime', runtime);
   // Transactional email. OSS default: the console no-op port (logs, sends
   // nothing) so a self-host deploy with no mail provider still works and invites
-  // surface their URL in the API response. The cloud package injects a real one.
-  app.decorate('email', email ?? createConsoleEmailPort({ info: (o, m) => app.log.info(o, m) }));
+  // surface their URL in the API response. SMTP activates it (EMAIL_PROVIDER=smtp
+  // + SMTP_HOST); the cloud package can inject its own provider.
+  app.decorate('email', emailPort);
   // In-process ingestion event bus; the SSE/webhook fan-out attaches here later
   // and Phase 10 can swap the singleton for a Redis-backed bus transparently.
   app.decorate('ingestionBus', ingestionBus);

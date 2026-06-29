@@ -115,6 +115,25 @@ const EnvSchema = z
     // response. The cloud package binds a real provider keyed off these.
     EMAIL_PROVIDER: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
+    // SMTP transport (OSS self-host email). Active only when EMAIL_PROVIDER=smtp
+    // AND SMTP_HOST is set (see config/runtime `isEmailConfigured`); enables
+    // password-reset + workspace-invite delivery. Unset → console no-op default.
+    //   SMTP_PORT   — default 587 (STARTTLS); use 465 with SMTP_SECURE=true.
+    //   SMTP_SECURE — true for implicit TLS (port 465); false/unset → STARTTLS.
+    SMTP_HOST: z.string().optional(),
+    // Coerce empty string → undefined first: the compose passthrough sends
+    // `SMTP_PORT=""` when unset, which `z.coerce.number()` would turn into 0 and
+    // fail `.positive()`, aborting boot. Empty must mean "use the default".
+    SMTP_PORT: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.coerce.number().int().positive().optional(),
+    ),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z
+      .string()
+      .optional()
+      .transform((v) => (v == null ? undefined : /^(true|1|yes|on)$/i.test(v.trim()))),
 
     // Outbound webhook delivery (PRD "Webhooks"). The runner polls the durable
     // `webhook_deliveries` queue and POSTs matching reports to external URLs.

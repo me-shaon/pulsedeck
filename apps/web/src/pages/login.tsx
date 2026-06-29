@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Github } from 'lucide-react';
 import { getAuthConfig } from '@/lib/api';
@@ -57,16 +57,27 @@ export function LoginPage() {
             placeholder="you@example.com"
           />
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Password</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-medium">
+              Password
+            </label>
+            <Link
+              to="/forgot-password"
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Input
+            id="password"
             type="password"
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </label>
+        </div>
 
         {error ? (
           <p role="alert" className="text-xs text-severity-critical">

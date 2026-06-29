@@ -2,6 +2,20 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import type { Db } from '../db/index.js';
 import { authAccounts, sessions, users, verifications } from '../db/schema/index.js';
+import { createConsoleEmailPort, type EmailPort } from '../services/email.js';
+
+/** Reset-password token lifetime (seconds). Short by design — see the spec. */
+const RESET_TOKEN_TTL_SECONDS = 3600;
+
+/** Optional dependencies for `createAuth` (injected at composition time). */
+export interface AuthDeps {
+  /**
+   * Transactional email port used to deliver password-reset links. Defaults to
+   * the console no-op so DB-less construction and OSS-without-mail still work;
+   * the resolved SMTP/cloud port is passed in from `index.ts`/`server.ts`.
+   */
+  email?: EmailPort;
+}
 
 /**
  * Auth-relevant slice of the validated environment. Kept as an interface (not
@@ -36,7 +50,8 @@ export function isGithubEnabled(env: AuthEnv): boolean {
  * a usable session). GitHub is added only when enabled (see `isGithubEnabled`).
  * `secret` comes from `AUTH_SECRET`; `baseURL` from `BETTER_AUTH_URL` when set.
  */
-export function createAuth(db: Db, env: AuthEnv = {}) {
+export function createAuth(db: Db, env: AuthEnv = {}, deps: AuthDeps = {}) {
+  const email = deps.email ?? createConsoleEmailPort();
   const github = isGithubEnabled(env)
     ? {
         github: {
@@ -74,6 +89,17 @@ export function createAuth(db: Db, env: AuthEnv = {}) {
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
+      // Reset tokens are short-lived; the link is delivered out-of-band via the
+      // email port (SMTP in OSS, console no-op when unconfigured). The web warns
+      // when delivery isn't configured (see `/api/v1/auth/config` emailConfigured).
+      resetPasswordTokenExpiresIn: RESET_TOKEN_TTL_SECONDS,
+      async sendResetPassword({ user, url }) {
+        await email.send({
+          to: user.email,
+          template: 'password-reset',
+          data: { url, name: user.name },
+        });
+      },
     },
     ...(github ? { socialProviders: github } : {}),
   });

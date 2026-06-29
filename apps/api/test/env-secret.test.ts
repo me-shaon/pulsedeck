@@ -85,3 +85,24 @@ describe('DATABASE_URL password policy', () => {
     expect(() => prod('postgres://pulsedeck:8f3c2a1b9d7e4f60a5c8@db:5432/pulsedeck')).not.toThrow();
   });
 });
+
+/**
+ * SMTP env coercion. The docker-compose passthrough sends `SMTP_PORT=""` when the
+ * var is unset; an empty string must mean "use the default", not coerce to 0 and
+ * abort boot via `.positive()`.
+ */
+describe('SMTP_PORT coercion', () => {
+  const base = {
+    DATABASE_URL: 'postgres://u:p@localhost:5432/db',
+    AUTH_SECRET: 'm0pe0C2EtDy+pdn6ejZouTl8oA3J7WP0CZ6XDkfFFVPzEn0OGMBg',
+  };
+
+  it('treats an empty SMTP_PORT as unset (does not abort boot)', () => {
+    const env = loadEnv({ ...base, SMTP_PORT: '' });
+    expect(env.SMTP_PORT).toBeUndefined();
+  });
+
+  it('coerces a numeric SMTP_PORT', () => {
+    expect(loadEnv({ ...base, SMTP_PORT: '2525' }).SMTP_PORT).toBe(2525);
+  });
+});

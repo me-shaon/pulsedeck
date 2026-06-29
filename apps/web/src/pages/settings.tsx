@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { EmailNotConfiguredBanner } from '@/components/settings/email-not-configured-banner';
 import {
   SecretRevealDialog,
   type SecretRevealData,
@@ -45,10 +46,13 @@ const TABS: SettingsTab[] = [
 
 /** Settings shell: a left tab rail + the active section rendered via Outlet. */
 export function SettingsLayout() {
-  const { workspace } = useCurrentWorkspace();
+  const { workspace, role } = useCurrentWorkspace();
   return (
     <PageContainer>
       <PageHeader title="Settings" description={`Manage ${workspace.name}.`} />
+      <div className="mb-6 empty:mb-0">
+        <EmailNotConfiguredBanner manage={canManage(role)} />
+      </div>
       <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
         <nav className="flex shrink-0 gap-1 overflow-x-auto lg:w-48 lg:flex-col lg:overflow-visible">
           {TABS.map((t) => (

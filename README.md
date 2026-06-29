@@ -229,6 +229,28 @@ Want a working example? [`packages/demo`](./packages/demo) is a complete referen
 
 ---
 
+## Email & password reset
+
+Out of the box PulseDeck sends no email — invite links surface in the app, and the
+**Forgot password?** flow shows a warning that email isn't configured. To enable
+password-reset delivery (and emailed invites), point PulseDeck at an SMTP server:
+
+```bash
+EMAIL_PROVIDER=smtp
+EMAIL_FROM="PulseDeck <no-reply@yourdomain.com>"
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587            # 587 STARTTLS (default) or 465 with SMTP_SECURE=true
+SMTP_USER=...
+SMTP_PASS=...
+```
+
+Once `EMAIL_PROVIDER=smtp` and `SMTP_HOST` are set, the admin banner in **Settings**
+disappears and reset links are delivered by email. Any standard SMTP provider works
+(Mailgun, Postmark, SES SMTP, Resend SMTP, your own server, etc.). See
+[`.env.example`](./.env.example) for all options.
+
+---
+
 ## Documentation
 
 Detailed guides — configuration, deployment, the full agent API, and development setup — live on the docs site:

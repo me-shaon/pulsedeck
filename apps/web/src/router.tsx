@@ -14,6 +14,8 @@ import { AppShell } from '@/components/app-shell/app-shell';
 import { ErrorState } from '@/components/common/states';
 import { PulseLine } from '@/components/pulse-line';
 import { LoginPage } from '@/pages/login';
+import { ForgotPasswordPage } from '@/pages/forgot-password';
+import { ResetPasswordPage } from '@/pages/reset-password';
 import { SetupPage } from '@/pages/setup';
 import { InvitePage } from '@/pages/invite';
 import { NewWorkspacePage } from '@/pages/new-workspace';
@@ -55,6 +57,21 @@ const loginRoute = createRoute({
     if (user) throw redirect({ to: search.redirect ?? '/' });
   },
   component: LoginPage,
+});
+
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/forgot-password',
+  component: ForgotPasswordPage,
+});
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reset-password',
+  validateSearch: (s: Record<string, unknown>): { token?: string } => ({
+    token: typeof s.token === 'string' ? s.token : undefined,
+  }),
+  component: ResetPasswordPage,
 });
 
 const setupRoute = createRoute({
@@ -240,6 +257,8 @@ const accountRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
   setupRoute,
   inviteRoute,
   newWorkspaceRoute,

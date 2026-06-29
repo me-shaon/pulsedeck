@@ -56,12 +56,24 @@ export interface RuntimeConfig {
    * client IPs in logs.
    */
   trustProxy: boolean | number | string;
-  /** Transactional email config (env `EMAIL_*`). Provider unset → console no-op. */
+  /** Transactional email config (env `EMAIL_*`/`SMTP_*`). Provider unset → console no-op. */
   email: {
-    /** Logical provider name; unset in OSS (console no-op). Cloud binds a real one. */
+    /** Logical provider name; unset in OSS (console no-op). `smtp` enables the SMTP port. */
     provider?: string;
     /** From address used by a configured provider. */
     from?: string;
+    /**
+     * SMTP transport config (env `SMTP_*`). Present only when `SMTP_HOST` is set.
+     * Email delivery is active only when `provider === 'smtp'` and this is present
+     * (see `isEmailConfigured`); otherwise the console no-op port is used.
+     */
+    smtp?: {
+      host: string;
+      port: number;
+      user?: string;
+      pass?: string;
+      secure: boolean;
+    };
   };
   /** Outbound webhook delivery config (env `WEBHOOK_*`). */
   webhook: {
@@ -100,6 +112,11 @@ export type RuntimeConfigEnv = Partial<
     | 'TRUST_PROXY'
     | 'EMAIL_PROVIDER'
     | 'EMAIL_FROM'
+    | 'SMTP_HOST'
+    | 'SMTP_PORT'
+    | 'SMTP_USER'
+    | 'SMTP_PASS'
+    | 'SMTP_SECURE'
     | 'WEBHOOK_POLL_INTERVAL_MS'
     | 'WEBHOOK_MAX_ATTEMPTS'
     | 'WEBHOOK_DELIVERY_TIMEOUT_MS'
@@ -162,6 +179,17 @@ export function buildRuntimeConfig(env: RuntimeConfigEnv): RuntimeConfig {
     email: {
       provider: env.EMAIL_PROVIDER,
       from: env.EMAIL_FROM,
+      ...(env.SMTP_HOST
+        ? {
+            smtp: {
+              host: env.SMTP_HOST,
+              port: env.SMTP_PORT ?? 587,
+              user: env.SMTP_USER,
+              pass: env.SMTP_PASS,
+              secure: env.SMTP_SECURE ?? false,
+            },
+          }
+        : {}),
     },
     webhook: {
       pollIntervalMs: env.WEBHOOK_POLL_INTERVAL_MS ?? 2000,
@@ -171,4 +199,16 @@ export function buildRuntimeConfig(env: RuntimeConfigEnv): RuntimeConfig {
       allowPrivateIps: env.WEBHOOK_ALLOW_PRIVATE_IPS ?? !isCloud,
     },
   };
+}
+
+/**
+ * Whether transactional email can actually be delivered. True only when the SMTP
+ * provider is selected AND its host is configured. Drives the capabilities
+ * surface (`/api/v1/auth/config` → `emailConfigured`) so the web can warn on the
+ * forgot-password page and show the admin "email not configured" banner. Features
+ * that need real delivery (password reset, workspace-invite emails) are inert
+ * until this is true.
+ */
+export function isEmailConfigured(config: RuntimeConfig): boolean {
+  return config.email.provider === 'smtp' && Boolean(config.email.smtp?.host);
 }

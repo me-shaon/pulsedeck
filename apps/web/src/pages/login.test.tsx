@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders as render } from '@/test/render';
 import userEvent from '@testing-library/user-event';
@@ -19,6 +20,11 @@ const search = vi.fn<() => { redirect?: string }>(() => ({}));
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigate,
   useSearch: () => search(),
+  Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock('@/lib/auth-client', () => ({ signIn: { email: vi.fn(), social: vi.fn() } }));
@@ -46,6 +52,7 @@ beforeEach(() => {
     setupRequired: false,
     signupMode: 'setup',
     billingEnabled: false,
+    emailConfigured: false,
   });
 });
 
@@ -90,6 +97,12 @@ describe('LoginPage', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/w/acme/settings' }));
   });
 
+  it('shows a "Forgot password?" link to /forgot-password', () => {
+    render(<LoginPage />);
+    const link = screen.getByRole('link', { name: /forgot password/i });
+    expect(link).toHaveAttribute('href', '/forgot-password');
+  });
+
   it('hides the GitHub button when GitHub is disabled', async () => {
     render(<LoginPage />);
     // Wait for the config query to settle, then assert the button is absent.
@@ -103,6 +116,7 @@ describe('LoginPage', () => {
       setupRequired: false,
       signupMode: 'setup',
       billingEnabled: false,
+      emailConfigured: false,
     });
     render(<LoginPage />);
     expect(

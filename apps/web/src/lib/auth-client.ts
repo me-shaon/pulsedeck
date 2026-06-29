@@ -10,7 +10,8 @@ export const authClient = createAuthClient({
   baseURL: typeof window !== 'undefined' ? window.location.origin : undefined,
 });
 
-export const { useSession, signIn, signOut, signUp } = authClient;
+export const { useSession, signIn, signOut, signUp, requestPasswordReset, resetPassword } =
+  authClient;
 
 /**
  * Imperative session fetch for router `beforeLoad` guards (where hooks can't

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { isGithubEnabled } from '../auth/auth.js';
 import { isSetupRequired, provisionFirstAdmin, SetupAlreadyCompletedError } from '../auth/setup.js';
+import { isEmailConfigured } from '../config/runtime.js';
 
 /**
  * Public auth-adjacent endpoints (no session required):
@@ -30,6 +31,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Deployment capabilities the web renders off (no `if (cloud)` forks).
       signupMode: app.runtime.signupMode,
       billingEnabled: app.runtime.billingEnabled,
+      // Whether transactional email can be delivered. Drives the forgot-password
+      // warning and the admin "email not configured" banner; password reset and
+      // invite emails are inert until this is true.
+      emailConfigured: isEmailConfigured(app.runtime),
     });
   });
 

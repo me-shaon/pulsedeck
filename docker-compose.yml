@@ -41,6 +41,16 @@ services:
       # older than N days; the sweep is single-run across replicas (advisory lock).
       RETENTION_DAYS: ${RETENTION_DAYS:-0}
       RETENTION_SWEEP_INTERVAL_MS: ${RETENTION_SWEEP_INTERVAL_MS:-3600000}
+      # Transactional email (password reset + invite delivery). Unset → console
+      # no-op (nothing sent). Set EMAIL_PROVIDER=smtp + SMTP_HOST in .env to enable;
+      # see .env.example. Passed through here so .env values reach the container.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
     ports:
       - '${API_PORT:-3001}:3001'
     depends_on:

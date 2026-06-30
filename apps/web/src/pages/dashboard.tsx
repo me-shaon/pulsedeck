@@ -218,21 +218,27 @@ export function DashboardPage() {
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
-              <Pencil className="size-4" /> Rename
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onSelect={() => setRenameOpen(true)}
+              className="whitespace-nowrap text-xs text-muted-foreground focus:text-foreground"
+            >
+              <Pencil className="size-3.5 shrink-0" /> Rename
             </DropdownMenuItem>
             {!dashboard.isDefault ? (
-              <DropdownMenuItem onSelect={() => void setAsDefault()}>
-                <Star className="size-4" /> Set as default
+              <DropdownMenuItem
+                onSelect={() => void setAsDefault()}
+                className="whitespace-nowrap text-xs text-muted-foreground focus:text-foreground"
+              >
+                <Star className="size-3.5 shrink-0" /> Set as default
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
               onSelect={() => setDeleteOpen(true)}
+              className="whitespace-nowrap text-xs text-destructive/80 focus:text-destructive"
             >
-              <Trash2 className="size-4" /> Delete
+              <Trash2 className="size-3.5 shrink-0" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

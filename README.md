@@ -39,7 +39,7 @@ You need [Docker](https://docs.docker.com/get-docker/) and `make` (plus
 `openssl`, preinstalled on macOS/Linux).
 
 ```bash
-git clone <repo-url> pulsedeck && cd pulsedeck
+git clone https://github.com/me-shaon/pulsedeck.git pulsedeck && cd pulsedeck
 make setup        # creates .env and generates strong secrets (idempotent)
 docker compose up # or `make up` to build + run detached
 ```
@@ -61,6 +61,11 @@ pnpm --filter @pulsedeck/demo dev --url http://localhost:3000 --token reg_xxxxx
 ```
 
 Charts, streams, and the live feed start populating right away.
+
+> **Heads up:** the demo agent runs with Node 22+ and pnpm on your host — it's a
+> workspace package, not part of the Docker image. If you set up with Docker and
+> don't have Node/pnpm, either install them or skip the demo; PulseDeck itself
+> runs fine without it.
 
 > **Port already taken?** Override it inline, e.g. `WEB_PORT=8080 docker compose up`.
 > Defaults: web `3000`, api `3001`, postgres `5432`.
@@ -84,7 +89,7 @@ there is no separate migration step.
 #### 1. Install dependencies
 
 ```bash
-git clone <repo-url> pulsedeck && cd pulsedeck
+git clone https://github.com/me-shaon/pulsedeck.git pulsedeck && cd pulsedeck
 pnpm install --frozen-lockfile
 ```
 
@@ -255,7 +260,7 @@ disappears and reset links are delivered by email. Any standard SMTP provider wo
 
 Detailed guides — configuration, deployment, the full agent API, and development setup — live on the docs site:
 
-📖 **[PulseDeck Documentation](#)** _(coming soon)_
+📖 **[PulseDeck Documentation](https://pulsedeck.app/docs)**
 
 Quick links for now:
 

@@ -1,5 +1,5 @@
-import { and, countDistinct, eq, inArray } from 'drizzle-orm';
-import type { Db } from '../db/index.js';
+import { and, countDistinct, eq, inArray, sql } from 'drizzle-orm';
+import type { Db, DbOrTx, Tx } from '../db/index.js';
 import { billingAccounts, webhooks, workspaceMembers, workspaces } from '../db/index.js';
 
 /**
@@ -37,7 +37,7 @@ export class LimitExceededError extends Error {
 }
 
 /** Read an account's limits. Missing account → all-unlimited (defensive). */
-export async function getAccountLimits(db: Db, accountId: string): Promise<AccountLimits> {
+export async function getAccountLimits(db: DbOrTx, accountId: string): Promise<AccountLimits> {
   const [row] = await db
     .select({
       retentionDays: billingAccounts.retentionDays,
@@ -57,7 +57,7 @@ export async function getAccountLimits(db: Db, accountId: string): Promise<Accou
 }
 
 /** Number of workspaces under an account. */
-export async function countWorkspaces(db: Db, accountId: string): Promise<number> {
+export async function countWorkspaces(db: DbOrTx, accountId: string): Promise<number> {
   const [row] = await db
     .select({ value: countDistinct(workspaces.id) })
     .from(workspaces)
@@ -66,7 +66,7 @@ export async function countWorkspaces(db: Db, accountId: string): Promise<number
 }
 
 /** Number of distinct member users across all of an account's workspaces (= seats). */
-export async function countSeats(db: Db, accountId: string): Promise<number> {
+export async function countSeats(db: DbOrTx, accountId: string): Promise<number> {
   const [row] = await db
     .select({ value: countDistinct(workspaceMembers.userId) })
     .from(workspaceMembers)
@@ -76,7 +76,7 @@ export async function countSeats(db: Db, accountId: string): Promise<number> {
 }
 
 /** Throw {@link LimitExceededError} if adding a workspace would exceed the plan. */
-export async function assertCanAddWorkspace(db: Db, accountId: string): Promise<void> {
+export async function assertCanAddWorkspace(db: DbOrTx, accountId: string): Promise<void> {
   const { maxWorkspaces } = await getAccountLimits(db, accountId);
   if (maxWorkspaces == null) return; // unlimited
   if ((await countWorkspaces(db, accountId)) >= maxWorkspaces) {
@@ -93,7 +93,7 @@ export async function assertCanAddWorkspace(db: Db, accountId: string): Promise<
  * not consume a new seat, so it's exempt from the ceiling check.
  */
 export async function assertCanAddSeat(
-  db: Db,
+  db: DbOrTx,
   accountId: string,
   existingUserId?: string,
 ): Promise<void> {
@@ -109,7 +109,10 @@ export async function assertCanAddSeat(
 }
 
 /** The owning account id for a workspace, or null if the workspace is unknown. */
-export async function accountIdForWorkspace(db: Db, workspaceId: string): Promise<string | null> {
+export async function accountIdForWorkspace(
+  db: DbOrTx,
+  workspaceId: string,
+): Promise<string | null> {
   const [row] = await db
     .select({ accountId: workspaces.accountId })
     .from(workspaces)
@@ -119,7 +122,7 @@ export async function accountIdForWorkspace(db: Db, workspaceId: string): Promis
 }
 
 /** Number of webhooks across all of an account's workspaces. */
-export async function countWebhooks(db: Db, accountId: string): Promise<number> {
+export async function countWebhooks(db: DbOrTx, accountId: string): Promise<number> {
   const wsRows = await db
     .select({ id: workspaces.id })
     .from(workspaces)
@@ -137,7 +140,7 @@ export async function countWebhooks(db: Db, accountId: string): Promise<number> 
  * Throw {@link LimitExceededError} if adding a webhook to `workspaceId` would
  * exceed the owning account's plan. `null` limit (the OSS default) is a no-op.
  */
-export async function assertCanAddWebhook(db: Db, workspaceId: string): Promise<void> {
+export async function assertCanAddWebhook(db: DbOrTx, workspaceId: string): Promise<void> {
   const accountId = await accountIdForWorkspace(db, workspaceId);
   if (!accountId) return; // unknown workspace — the route's RBAC gate handles existence
   const { maxWebhooks } = await getAccountLimits(db, accountId);
@@ -150,8 +153,37 @@ export async function assertCanAddWebhook(db: Db, workspaceId: string): Promise<
   }
 }
 
+/**
+ * Advisory-lock class for per-account quota enforcement. Arbitrary but stable;
+ * paired with `hashtext(accountId)` as the second key so the lock namespace is
+ * isolated from any other advisory lock in the system.
+ */
+const ACCOUNT_QUOTA_LOCK_CLASS = 0x5044; // "PD"
+
+/**
+ * Run `fn` inside a transaction that first takes a per-account advisory lock, so
+ * a quota check and the insert it guards are serialized against every other
+ * create for the same account. Without this the check (count) and the insert are
+ * two unlocked round-trips: N concurrent creates each read `count = limit-1`,
+ * all pass, and all insert — overshooting the quota (TOCTOU). The lock is
+ * transaction-scoped (`pg_advisory_xact_lock`), auto-released on commit/rollback;
+ * keyed by `hashtext(accountId)` so distinct accounts never contend.
+ */
+export async function withAccountQuotaLock<T>(
+  db: Db,
+  accountId: string,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(${ACCOUNT_QUOTA_LOCK_CLASS}, hashtext(${accountId}))`,
+    );
+    return fn(tx);
+  });
+}
+
 /** Whether a user already holds membership in some workspace of the account. */
-async function isAccountMember(db: Db, accountId: string, userId: string): Promise<boolean> {
+async function isAccountMember(db: DbOrTx, accountId: string, userId: string): Promise<boolean> {
   const [match] = await db
     .select({ userId: workspaceMembers.userId })
     .from(workspaceMembers)

@@ -2,9 +2,9 @@ import { severitySchema } from '@pulsedeck/schema';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { makeRequireAuth, makeRequireWorkspaceRole } from '../auth/fastify.js';
-import { assertCanAddWebhook, LimitExceededError } from '../services/limits.js';
+import { LimitExceededError } from '../services/limits.js';
 import {
-  createWebhook,
+  createWebhookWithinLimit,
   deleteWebhook,
   enqueueTestDelivery,
   getWebhook,
@@ -68,13 +68,15 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', issues: parsed.error.issues });
     }
+    let row;
     try {
       await assertUrlAllowed(parsed.data.url, allowPrivateIps);
-      await assertCanAddWebhook(db, workspaceId);
+      // Quota check + insert are serialized under a per-account advisory lock so
+      // concurrent creates can't overshoot maxWebhooks (see createWebhookWithinLimit).
+      row = await createWebhookWithinLimit(db, workspaceId, parsed.data);
     } catch (err) {
       return sendDomainError(reply, err);
     }
-    const row = await createWebhook(db, workspaceId, parsed.data);
     app.webhookEnqueuer.invalidate(workspaceId);
     // The full row (incl. `secret`) is returned ONLY here.
     return reply.code(201).send({ webhook: row });

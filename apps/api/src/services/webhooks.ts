@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, lt, or } from 'drizzle-orm';
-import type { Db } from '../db/index.js';
+import type { Db, DbOrTx } from '../db/index.js';
 import { categories, id, workspaces } from '../db/index.js';
+import { accountIdForWorkspace, assertCanAddWebhook, withAccountQuotaLock } from './limits.js';
 import type { Webhook, WebhookDelivery, WebhookFormat } from '../db/schema/webhooks.js';
 import { webhookDeliveries, webhooks } from '../db/schema/webhooks.js';
 import type { Severity } from '@pulsedeck/schema';
@@ -36,7 +37,7 @@ export interface WebhookInput {
 
 /** Keep only category ids that actually belong to this workspace. */
 async function pruneCategoryIds(
-  db: Db,
+  db: DbOrTx,
   workspaceId: string,
   categoryIds: string[],
 ): Promise<string[]> {
@@ -81,7 +82,7 @@ async function findRow(
 
 /** Create a webhook. Returns the full row INCLUDING the one-time `secret`. */
 export async function createWebhook(
-  db: Db,
+  db: DbOrTx,
   workspaceId: string,
   input: WebhookInput,
 ): Promise<Webhook> {
@@ -100,6 +101,27 @@ export async function createWebhook(
     })
     .returning();
   return row;
+}
+
+/**
+ * Create a webhook while enforcing the owning account's `maxWebhooks` quota
+ * atomically. The count check and the insert run in ONE transaction holding a
+ * per-account advisory lock, so concurrent creates across the account's
+ * workspaces are serialized and can never overshoot the limit (throws
+ * {@link LimitExceededError} on the losers). Unknown workspace / unlimited plan
+ * skips the lock and inserts directly (the route's RBAC gate handles existence).
+ */
+export async function createWebhookWithinLimit(
+  db: Db,
+  workspaceId: string,
+  input: WebhookInput,
+): Promise<Webhook> {
+  const accountId = await accountIdForWorkspace(db, workspaceId);
+  if (!accountId) return createWebhook(db, workspaceId, input);
+  return withAccountQuotaLock(db, accountId, async (tx) => {
+    await assertCanAddWebhook(tx, workspaceId);
+    return createWebhook(tx, workspaceId, input);
+  });
 }
 
 /** Patch an existing webhook. Returns the public row, or null if not found. */

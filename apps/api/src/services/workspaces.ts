@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
-import type { Db } from '../db/index.js';
+import type { Db, Tx } from '../db/index.js';
 import { id, workspaceMembers, workspaces, type Workspace } from '../db/index.js';
+import { assertCanAddWorkspace, withAccountQuotaLock } from './limits.js';
 
 /**
  * Workspace provisioning shared by `/setup`, headless bootstrap, and the
@@ -18,9 +19,6 @@ function slugStem(name: string): string {
     .slice(0, 40);
   return stem || 'workspace';
 }
-
-/** A Drizzle transaction handle (the argument to `db.transaction`). */
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /**
  * Insert a workspace + its Owner membership using an existing transaction.
@@ -56,4 +54,25 @@ export async function createWorkspaceWithOwner(
   accountId: string,
 ): Promise<Workspace> {
   return db.transaction((tx) => insertWorkspaceWithOwner(tx, ownerId, name, accountId));
+}
+
+/**
+ * Create a workspace while enforcing the account's `maxWorkspaces` quota
+ * atomically. The count check and the insert run in ONE transaction holding a
+ * per-account advisory lock, so concurrent creates for the same account are
+ * serialized and can never overshoot the limit (throws {@link LimitExceededError}
+ * on the losers). This is the enforcement path the create-workspace route uses;
+ * {@link createWorkspaceWithOwner} stays for the unlimited/internal callers
+ * (setup, bootstrap) that don't go through a quota.
+ */
+export async function createWorkspaceWithOwnerWithinLimit(
+  db: Db,
+  ownerId: string,
+  name: string,
+  accountId: string,
+): Promise<Workspace> {
+  return withAccountQuotaLock(db, accountId, async (tx: Tx) => {
+    await assertCanAddWorkspace(tx, accountId);
+    return insertWorkspaceWithOwner(tx, ownerId, name, accountId);
+  });
 }

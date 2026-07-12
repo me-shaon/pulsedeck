@@ -15,6 +15,16 @@ export function createDrizzle(sql: Sql) {
 /** Typed Drizzle database instance for PulseDeck. */
 export type Db = ReturnType<typeof createDrizzle>;
 
+/** A Drizzle transaction handle (the argument to `db.transaction`). */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+/**
+ * A query executor: either the pooled `Db` or an open transaction `Tx`. Read
+ * helpers accept this so the same count/limit logic runs both standalone and
+ * inside a quota-enforcing transaction.
+ */
+export type DbOrTx = Db | Tx;
+
 export { schema };
 export * from './schema/index.js';
 export * from './id.js';

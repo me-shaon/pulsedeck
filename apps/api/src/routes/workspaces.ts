@@ -8,12 +8,11 @@ import { id, invites, users, workspaceMembers, workspaces } from '../db/index.js
 import { accountIdForUser } from '../services/accounts.js';
 import {
   assertCanAddSeat,
-  assertCanAddWorkspace,
   countSeats,
   countWorkspaces,
   getAccountLimits,
 } from '../services/limits.js';
-import { createWorkspaceWithOwner } from '../services/workspaces.js';
+import { createWorkspaceWithOwnerWithinLimit } from '../services/workspaces.js';
 
 /**
  * Workspace, membership, and invite endpoints under `/api/v1`.
@@ -109,8 +108,9 @@ export async function workspaceRoutes(app: FastifyInstance): Promise<void> {
     // New workspaces join the caller's existing account; enforce its quota.
     const accountId = await accountIdForUser(db, request.user!.id);
     if (!accountId) return reply.code(403).send({ error: 'No account for user' });
-    await assertCanAddWorkspace(db, accountId);
-    const workspace = await createWorkspaceWithOwner(
+    // Quota check + insert are serialized under a per-account advisory lock so
+    // concurrent creates can't overshoot maxWorkspaces (throws LimitExceededError → 402).
+    const workspace = await createWorkspaceWithOwnerWithinLimit(
       db,
       request.user!.id,
       parsed.data.name,

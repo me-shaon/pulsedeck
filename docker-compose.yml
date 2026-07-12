@@ -5,10 +5,11 @@
 # README): docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 services:
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    image: pulsedeck/api:latest
+    # Pre-built image published to Docker Hub by .github/workflows/release.yml, so
+    # `docker compose up` runs without cloning the repo. Pin a release by setting
+    # PULSEDECK_VERSION (e.g. v1.0.0); defaults to :latest. To build locally
+    # instead, overlay docker-compose.build.yml (see Makefile `make build`).
+    image: ahmedshamimhassan/pulsedeck-api:${PULSEDECK_VERSION:-latest}
     restart: unless-stopped
     environment:
       # Production posture: the API rejects known placeholder secrets when this
@@ -68,10 +69,9 @@ services:
       start_period: 30s # grace for install-free boot + startup migrations
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    image: pulsedeck/web:latest
+    # Published by release.yml (see the api service note). Overlay
+    # docker-compose.build.yml to build from source instead.
+    image: ahmedshamimhassan/pulsedeck-web:${PULSEDECK_VERSION:-latest}
     restart: unless-stopped
     ports:
       - '${WEB_PORT:-3000}:80'

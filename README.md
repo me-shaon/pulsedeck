@@ -41,13 +41,24 @@ You need [Docker](https://docs.docker.com/get-docker/) and `make` (plus
 ```bash
 git clone https://github.com/me-shaon/pulsedeck.git pulsedeck && cd pulsedeck
 make setup        # creates .env and generates strong secrets (idempotent)
-docker compose up # or `make up` to build + run detached
+docker compose up # pulls the published images; or `make up` to run detached
 ```
 
 `make setup` is required: the stack refuses to boot without a real
 `AUTH_SECRET`/`POSTGRES_PASSWORD`, so it can never run on a known value.
 
 Open **http://localhost:3000**, create your account and workspace, and you're running.
+
+The images are pre-built and published to Docker Hub
+(`ahmedshamimhassan/pulsedeck-api`, `ahmedshamimhassan/pulsedeck-web`), so
+`docker compose up` never builds locally. Pin a release
+with `PULSEDECK_VERSION=v1.0.0 docker compose up`; omit it for `:latest`. To
+build from source instead — e.g. after editing a `Dockerfile` — use
+`make build` / `make up-build`.
+
+**Deploy without cloning:** because the compose file is self-contained, you only
+need three files on the host — `docker-compose.yml`, `.env` (from `.env.example`),
+and a valid `AUTH_SECRET`/`POSTGRES_PASSWORD` — then `docker compose up -d`.
 
 ### See it with live data
 

@@ -4,9 +4,10 @@
 # Run `make help` for the full list.
 
 DEV := docker compose -f docker-compose.yml -f docker-compose.dev.yml
+BUILD := docker compose -f docker-compose.yml -f docker-compose.build.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help setup up down logs build dev dev-down dev-logs dev-fresh fresh db-reset ps clean
+.PHONY: help setup up up-build down logs build dev dev-down dev-logs dev-fresh fresh db-reset ps clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -17,8 +18,11 @@ setup: ## Generate production secrets into .env (idempotent; safe to re-run)
 	./scripts/gen-secrets.sh
 
 ## ── Production ──────────────────────────────────────────────────────────────
-up: ## Build + start the production stack (detached)
-	docker compose up -d --build
+up: ## Pull published images + start the production stack (detached)
+	docker compose up -d --pull always
+
+up-build: ## Build images from source, then start the production stack (detached)
+	$(BUILD) up -d --build
 
 down: ## Stop the production stack
 	docker compose down
@@ -26,8 +30,8 @@ down: ## Stop the production stack
 logs: ## Tail production logs
 	docker compose logs -f
 
-build: ## Build the production images
-	docker compose build
+build: ## Build the production images from source (no push)
+	$(BUILD) build
 
 ## ── Development (hot reload) ────────────────────────────────────────────────
 dev: ## Start the dev stack with hot reload (foreground; Ctrl-C to stop)

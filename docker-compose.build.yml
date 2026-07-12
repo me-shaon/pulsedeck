@@ -1,0 +1,27 @@
+# ---------------------------------------------------------------------------
+# LOCAL BUILD overlay — build the production images from source instead of
+# pulling the pre-built ones from Docker Hub. Merge ON TOP of the production
+# compose:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+#   (or simply `make build` / `make up-build`)
+#
+# Use this when changing apps/{api,web}/Dockerfile or verifying an image before
+# it is published. The base docker-compose.yml is intentionally self-contained
+# (pulls published images), so the `build:` context lives here, not there.
+#
+# NOTE: this is the PRODUCTION build (apps/{api,web}/Dockerfile). For hot-reload
+# development use docker-compose.dev.yml, which builds a separate dev image
+# (Dockerfile.dev) with a bind-mounted working tree.
+# ---------------------------------------------------------------------------
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
